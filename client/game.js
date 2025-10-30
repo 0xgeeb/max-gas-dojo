@@ -1,23 +1,58 @@
+// ========================================
+// HITBOX CONFIGURATION
+// Adjust these values to customize hitboxes for each sprite
+// Must match server/server.js HITBOX_CONFIG
+// ========================================
+const HITBOX_CONFIG = {
+    player1: {
+        // Player body hitbox
+        width: 45,
+        height: 105,
+        yOffset: 400,  // Ground position (feet)
+
+        // Attack hitbox
+        attack: {
+            range: 70,      // How far attack reaches
+            height: 55,     // Attack hitbox height
+            yOffset: 105    // Distance above ground for attack
+        }
+    },
+    player2: {
+        // Player body hitbox
+        width: 45,
+        height: 105,
+        yOffset: 400,  // Ground position (feet)
+
+        // Attack hitbox
+        attack: {
+            range: 70,      // How far attack reaches
+            height: 55,     // Attack hitbox height
+            yOffset: 105    // Distance above ground for attack
+        }
+    }
+};
+// ========================================
+
 class Game {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         this.socket = io();
-        
+
         this.spriteManager = new SpriteManager();
         this.inputManager = null;
-        
+
         this.gameState = null;
         this.playerId = null;
         this.gameId = null;
-        
+
         this.lastTime = 0;
         this.isGameRunning = false;
         this.isWaitingRoom = true;
-        
+
         // Store animated sprites separately
         this.playerSprites = new Map();
-        
+
         this.setupSocketEvents();
         this.loadAssets();
     }
@@ -228,11 +263,14 @@ class Game {
     }
 
     drawHitboxes(player, isMyPlayer) {
-        // Player hitbox (matches server logic at server.js:145-150)
-        const playerHitboxX = player.x - player.width / 2;
-        const playerHitboxY = player.y - player.height;
-        const playerHitboxWidth = player.width;
-        const playerHitboxHeight = player.height;
+        // Get sprite-specific hitbox config
+        const config = HITBOX_CONFIG[player.sprite];
+
+        // Player body hitbox
+        const playerHitboxX = player.x - config.width / 2;
+        const playerHitboxY = player.y - config.height;
+        const playerHitboxWidth = config.width;
+        const playerHitboxHeight = config.height / 2;
 
         // Draw player hitbox - light blue for user, dark blue for enemy
         this.ctx.strokeStyle = isMyPlayer ? 'rgba(135, 206, 250, 0.8)' : 'rgba(0, 0, 139, 0.8)';
@@ -241,16 +279,16 @@ class Game {
         this.ctx.fillStyle = isMyPlayer ? 'rgba(135, 206, 250, 0.2)' : 'rgba(0, 0, 139, 0.2)';
         this.ctx.fillRect(playerHitboxX, playerHitboxY, playerHitboxWidth, playerHitboxHeight);
 
-        // Attack hitbox (only show when attacking) - matches server logic at server.js:117-136
+        // Attack hitbox (only show when attacking)
         if (player.state === 'attack1') {
-            const attackRange = 80;
-            const attackWidth = 60;
-            const attackHeight = 80;
+            const attackRange = config.attack.range;
+            const attackHeight = config.attack.height;
+            const attackYOffset = config.attack.yOffset;
 
             let attackHitboxX, attackHitboxY;
             if (player.facing === 'right') {
-                attackHitboxX = player.x + player.width;
-                attackHitboxY = player.y - attackHeight;
+                attackHitboxX = player.x;
+                attackHitboxY = player.y - attackYOffset;
             } else {
                 attackHitboxX = player.x - attackRange;
                 attackHitboxY = player.y - attackHeight;

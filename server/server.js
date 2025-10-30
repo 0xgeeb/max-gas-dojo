@@ -22,6 +22,40 @@ app.use('/assets', express.static(path.join(__dirname, '../assets')));
 const games = new Map();
 const players = new Map();
 
+// ========================================
+// HITBOX CONFIGURATION
+// Adjust these values to customize hitboxes for each sprite
+// ========================================
+const HITBOX_CONFIG = {
+  player1: {
+    // Player body hitbox
+    width: 45,
+    height: 105,
+    yOffset: 400,  // Ground position (feet)
+
+    // Attack hitbox
+    attack: {
+      range: 70,      // How far attack reaches
+      height: 55,     // Attack hitbox height
+      yOffset: 105    // Distance above ground for attack
+    }
+  },
+  player2: {
+    // Player body hitbox
+    width: 45,
+    height: 105,
+    yOffset: 400,  // Ground position (feet)
+
+    // Attack hitbox
+    attack: {
+      range: 70,      // How far attack reaches
+      height: 55,     // Attack hitbox height
+      yOffset: 105    // Distance above ground for attack
+    }
+  }
+};
+// ========================================
+
 // Game logic
 class GameState {
   constructor(id) {
@@ -33,12 +67,16 @@ class GameState {
   }
 
   addPlayer(socketId, playerData) {
+    // Get hitbox config for this sprite type
+    const spriteType = playerData.sprite || 'player1';
+    const config = HITBOX_CONFIG[spriteType];
+
     this.players.set(socketId, {
       id: socketId,
       x: playerData.x || 100,
-      y: playerData.y || 400,
-      width: 64,
-      height: 64,
+      y: playerData.y || config.yOffset,
+      width: config.width,
+      height: config.height,
       velocityX: 0,
       velocityY: 0,
       onGround: true,
@@ -64,6 +102,10 @@ class GameState {
 
     // Update each player
     for (let [socketId, player] of this.players) {
+      // Get sprite-specific config
+      const config = HITBOX_CONFIG[player.sprite];
+      const groundLevel = config.yOffset;
+
       // Apply gravity
       if (!player.onGround) {
         player.velocityY += 800 * deltaTime; // Gravity
@@ -78,8 +120,8 @@ class GameState {
       player.y += player.velocityY * deltaTime;
 
       // Ground collision
-      if (player.y >= 400) {
-        player.y = 400;
+      if (player.y >= groundLevel) {
+        player.y = groundLevel;
         player.velocityY = 0;
         player.onGround = true;
         // Return to idle or run when landing (unless attacking or hit)
@@ -113,16 +155,17 @@ class GameState {
 
       // Only check if player is currently attacking
       if (attacker.state === 'attack1' && attacker.isAttacking) {
-        // Calculate attack hitbox
-        const attackRange = 80;
-        const attackWidth = 60;
-        const attackHeight = 80;
+        // Get sprite-specific attack hitbox config
+        const attackerConfig = HITBOX_CONFIG[attacker.sprite];
+        const attackRange = attackerConfig.attack.range;
+        const attackHeight = attackerConfig.attack.height;
+        const attackYOffset = attackerConfig.attack.yOffset;
 
         let attackHitbox;
         if (attacker.facing === 'right') {
           attackHitbox = {
-            x: attacker.x + attacker.width,
-            y: attacker.y - attackHeight,
+            x: attacker.x,
+            y: attacker.y - attackYOffset,
             width: attackRange,
             height: attackHeight
           };
@@ -141,12 +184,12 @@ class GameState {
 
           const defender = playersArray[j];
 
-          // Player hitbox
+          // Player hitbox (matches client game.js:232-235)
           const playerHitbox = {
             x: defender.x - defender.width / 2,
             y: defender.y - defender.height,
             width: defender.width,
-            height: defender.height
+            height: defender.height / 2
           };
 
           // Check if attack hitbox overlaps with player hitbox
@@ -255,37 +298,44 @@ io.on('connection', (socket) => {
 
 
 
-    // Handle input - but don't interrupt attacks or hit reactions
-    const canMove = player.state !== 'attack1' && player.state !== 'takeHit' && player.state !== 'death';
+    // Handle input - block movement during hit reactions and death, but allow during attacks
+    const canMove = player.state !== 'takeHit' && player.state !== 'death';
+    const canChangeState = canMove && player.state !== 'attack1';
 
     switch (data.action) {
       case 'moveLeft':
         if (canMove) {
           player.velocityX = -200;
           player.facing = 'left';
-          player.state = 'run';
+          if (canChangeState) {
+            player.state = 'run';
+          }
         }
         break;
       case 'moveRight':
         if (canMove) {
           player.velocityX = 200;
           player.facing = 'right';
-          player.state = 'run';
+          if (canChangeState) {
+            player.state = 'run';
+          }
         }
         break;
       case 'stop':
-        // Always update velocity, even during attacks
-        player.velocityX = 0;
-        // Only change state if not in a locked state
         if (canMove) {
-          player.state = 'idle';
+          player.velocityX = 0;
+          if (canChangeState) {
+            player.state = 'idle';
+          }
         }
         break;
       case 'jump':
         if (canMove && player.onGround) {
           player.velocityY = -400;
           player.onGround = false;
-          player.state = 'jump';
+          if (canChangeState) {
+            player.state = 'jump';
+          }
         }
         break;
       case 'attack':
