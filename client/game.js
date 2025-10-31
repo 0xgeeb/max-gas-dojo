@@ -6,20 +6,20 @@
 const HITBOX_CONFIG = {
     player1: {
         // Player body hitbox
-        width: 45,
+        width: 40,
         height: 105,
         yOffset: 400,  // Ground position (feet)
 
         // Attack hitbox
         attack: {
             range: 70,      // How far attack reaches
-            height: 55,     // Attack hitbox height
-            yOffset: 105    // Distance above ground for attack
+            height: 75,     // Attack hitbox height
+            yOffset: 125    // Distance above ground for attack
         }
     },
     player2: {
         // Player body hitbox
-        width: 45,
+        width: 40,
         height: 105,
         yOffset: 400,  // Ground position (feet)
 
@@ -291,7 +291,7 @@ class Game {
                 attackHitboxY = player.y - attackYOffset;
             } else {
                 attackHitboxX = player.x - attackRange;
-                attackHitboxY = player.y - attackHeight;
+                attackHitboxY = player.y - attackYOffset;
             }
 
             // Draw attack hitbox - light red for user, dark red for enemy

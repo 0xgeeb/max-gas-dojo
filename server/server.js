@@ -29,20 +29,20 @@ const players = new Map();
 const HITBOX_CONFIG = {
   player1: {
     // Player body hitbox
-    width: 45,
+    width: 40,
     height: 105,
     yOffset: 400,  // Ground position (feet)
 
     // Attack hitbox
     attack: {
       range: 70,      // How far attack reaches
-      height: 55,     // Attack hitbox height
-      yOffset: 105    // Distance above ground for attack
+      height: 75,     // Attack hitbox height
+      yOffset: 125    // Distance above ground for attack
     }
   },
   player2: {
     // Player body hitbox
-    width: 45,
+    width: 40,
     height: 105,
     yOffset: 400,  // Ground position (feet)
 
@@ -172,7 +172,7 @@ class GameState {
         } else {
           attackHitbox = {
             x: attacker.x - attackRange,
-            y: attacker.y - attackHeight,
+            y: attacker.y - attackYOffset,
             width: attackRange,
             height: attackHeight
           };
