@@ -3,6 +3,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const path = require('path');
+const serverWeb3Manager = require('./web3');
 
 const app = express();
 const server = http.createServer(app);
@@ -21,6 +22,9 @@ app.use('/assets', express.static(path.join(__dirname, '../assets')));
 // Game state storage
 const games = new Map();
 const players = new Map();
+
+// Match data storage (wallet addresses, stakes, etc.)
+const matchData = new Map();
 
 // ========================================
 // HITBOX CONFIGURATION
@@ -58,12 +62,15 @@ const HITBOX_CONFIG = {
 
 // Game logic
 class GameState {
-  constructor(id) {
+  constructor(id, matchId = null) {
     this.id = id;
+    this.matchId = matchId; // Blockchain match ID
     this.players = new Map();
     this.gameLoop = null;
     this.isRunning = false;
     this.lastUpdate = Date.now();
+    this.matchResolved = false;
+    this.disconnectTimeout = null;
   }
 
   addPlayer(socketId, playerData) {
@@ -209,6 +216,8 @@ class GameState {
                 }, 300);
               } else {
                 defender.state = 'death';
+                // Trigger match resolution on blockchain
+                this.onPlayerDeath(attacker, defender);
               }
 
               attacker.hasHitThisAttack = true;
@@ -232,6 +241,49 @@ class GameState {
       players: Array.from(this.players.values())
     };
   }
+
+  onPlayerDeath(winner, loser) {
+    // Only resolve once
+    if (this.matchResolved) return;
+    this.matchResolved = true;
+
+    // If this is a blockchain match, resolve it
+    if (this.matchId) {
+      const match = matchData.get(this.matchId);
+      if (match) {
+        const winnerData = match.players.get(winner.id);
+        const loserData = match.players.get(loser.id);
+
+        if (winnerData && loserData && winnerData.walletAddress && loserData.walletAddress) {
+          console.log(`Player ${loser.id} died. Resolving match on blockchain...`);
+          resolveMatchOnChain(
+            this.matchId,
+            winnerData.walletAddress,
+            loserData.walletAddress
+          ).then(result => {
+            console.log('Match resolved successfully:', result);
+          }).catch(error => {
+            console.error('Failed to resolve match:', error);
+          });
+        } else {
+          console.log('Match ended but no wallet addresses found');
+        }
+      }
+    }
+  }
+}
+
+// Helper function to resolve match on blockchain
+async function resolveMatchOnChain(matchId, winnerAddress, loserAddress) {
+  try {
+    console.log(`Resolving match ${matchId} on blockchain...`);
+    const result = await serverWeb3Manager.resolveMatch(matchId, winnerAddress, loserAddress);
+    console.log('Match resolved:', result);
+    return result;
+  } catch (error) {
+    console.error('Error resolving match on chain:', error);
+    throw error;
+  }
 }
 
 // Socket.io event handlers
@@ -240,7 +292,7 @@ io.on('connection', (socket) => {
 
   socket.on('joinGame', (data) => {
     let game = null;
-    
+
     // Find an available game or create new one
     for (let [gameId, gameState] of games) {
       if (gameState.players.size < 2) {
@@ -251,8 +303,32 @@ io.on('connection', (socket) => {
 
     if (!game) {
       const gameId = Date.now().toString();
-      game = new GameState(gameId);
+      // Use the matchId from the first player if provided
+      const matchId = data.matchId || null;
+      game = new GameState(gameId, matchId);
       games.set(gameId, game);
+
+      // Initialize match data for blockchain matches
+      if (matchId) {
+        matchData.set(matchId, {
+          gameId: gameId,
+          players: new Map(),
+          stakeAmount: data.stakeAmount || 0,
+          startTime: Date.now()
+        });
+      }
+    }
+
+    // Store wallet address for this player (for blockchain resolution)
+    if (data.walletAddress && game.matchId) {
+      const match = matchData.get(game.matchId);
+      if (match) {
+        match.players.set(socket.id, {
+          walletAddress: data.walletAddress,
+          stakeAmount: data.stakeAmount,
+          isStaked: data.isStaked
+        });
+      }
     }
 
     // Add player to game
@@ -261,13 +337,12 @@ io.on('connection', (socket) => {
     game.addPlayer(socket.id, {
       x: isFirstPlayer ? 100 : 700,
       sprite: randomSprite,
-      facing: isFirstPlayer ? 'right' : 'left'
+      facing: isFirstPlayer ? 'right' : 'left',
+      walletAddress: data.walletAddress
     });
 
     players.set(socket.id, game.id);
     socket.join(game.id);
-
-
 
     // Start game loop if not already running
     if (!game.isRunning) {
@@ -354,16 +429,34 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('Player disconnected:', socket.id);
-    
+
     const gameId = players.get(socket.id);
     if (gameId) {
       const game = games.get(gameId);
       if (game) {
+        // If this is a blockchain match with 2 players, start disconnect timeout
+        if (game.matchId && game.players.size === 2 && !game.matchResolved) {
+          const disconnectedPlayer = game.players.get(socket.id);
+          const remainingPlayer = Array.from(game.players.values()).find(p => p.id !== socket.id);
+
+          if (disconnectedPlayer && remainingPlayer) {
+            console.log(`Player ${socket.id} disconnected. Starting 30s timeout...`);
+
+            // Start timeout - if disconnected player doesn't reconnect in 30s, award match to remaining player
+            game.disconnectTimeout = setTimeout(() => {
+              if (game.players.size === 1 && !game.matchResolved) {
+                console.log(`Timeout reached. Awarding match to ${remainingPlayer.id}`);
+                game.onPlayerDeath(remainingPlayer, disconnectedPlayer);
+              }
+            }, 30000); // 30 seconds
+          }
+        }
+
         game.removePlayer(socket.id);
-        
+
         // Immediately send updated game state to remaining players
         io.to(game.id).emit('gameState', game.getState());
-        
+
         // Keep game loop running even with 1 player (for waiting room)
         // Only stop if no players left
         if (game.players.size === 0) {
@@ -371,11 +464,24 @@ io.on('connection', (socket) => {
             clearInterval(game.gameLoop);
             game.isRunning = false;
           }
+          if (game.disconnectTimeout) {
+            clearTimeout(game.disconnectTimeout);
+          }
         }
       }
       players.delete(socket.id);
     }
   });
+});
+
+// Initialize Web3 on server startup
+serverWeb3Manager.initialize().then(initialized => {
+  if (initialized) {
+    console.log('Server Web3 Manager initialized successfully');
+    console.log('Oracle address:', serverWeb3Manager.getOracleAddress());
+  } else {
+    console.log('Server Web3 Manager not initialized (running in mock mode)');
+  }
 });
 
 const PORT = process.env.PORT || 3000;

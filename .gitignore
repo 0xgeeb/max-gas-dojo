@@ -1,2 +1,4 @@
 /node_modules
 /old_wc
+/contracts/lib
+.env
