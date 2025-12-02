@@ -64,124 +64,37 @@ class Game {
     }
 
     setupWeb3UI() {
-        // Get UI elements
-        const connectWalletBtn = document.getElementById('connectWalletBtn');
-        const stakeBtn = document.getElementById('stakeBtn');
-        const approveBtn = document.getElementById('approveBtn');
-        const walletInfo = document.getElementById('walletInfo');
-        const stakingSection = document.getElementById('stakingSection');
-        const walletAddress = document.getElementById('walletAddress');
-        const tokenBalance = document.getElementById('tokenBalance');
-        const txStatus = document.getElementById('txStatus');
-        const networkName = document.getElementById('networkName');
-        const contractStatus = document.getElementById('contractStatus');
+        const web3Container = document.getElementById('web3Container');
 
-        // Connect wallet button
-        connectWalletBtn.addEventListener('click', async () => {
+        // Handle click on wallet container
+        web3Container.addEventListener('click', async () => {
+            if (this.web3Manager.isConnected) {
+                return; // Already connected, do nothing (or could add disconnect functionality)
+            }
+
             try {
-                connectWalletBtn.textContent = 'Connecting...';
-                connectWalletBtn.disabled = true;
-
+                web3Container.textContent = 'connecting...';
                 await this.web3Manager.connectWallet();
 
-                // Update UI
-                walletAddress.textContent = this.web3Manager.formatAddress(this.web3Manager.account);
-                walletInfo.classList.remove('hidden');
-                stakingSection.classList.remove('hidden');
-                connectWalletBtn.textContent = 'Connected';
-                connectWalletBtn.classList.add('success');
+                // Update UI with abbreviated address
+                web3Container.textContent = this.web3Manager.formatAddress(this.web3Manager.account);
 
-                // Update token balance
-                const balance = await this.web3Manager.getTokenBalance();
-                tokenBalance.textContent = balance;
-
-                // Enable stake button
-                stakeBtn.disabled = false;
-
-                // Update network info
-                const chainId = await this.web3Manager.getChainId();
-                networkName.textContent = this.getNetworkName(chainId);
-
+                // Automatically join the game after connecting
+                this.joinGame();
             } catch (error) {
                 console.error('Error connecting wallet:', error);
-                connectWalletBtn.textContent = 'Connect Wallet';
-                connectWalletBtn.disabled = false;
-                this.showTxStatus('Error: ' + error.message, 'error');
-            }
-        });
-
-        // Stake button
-        stakeBtn.addEventListener('click', async () => {
-            try {
-                const stakeAmount = parseFloat(document.getElementById('stakeAmount').value);
-
-                if (!stakeAmount || stakeAmount <= 0) {
-                    this.showTxStatus('Please enter a valid stake amount', 'error');
-                    return;
-                }
-
-                // Check if user has enough tokens
-                const hasEnough = await this.web3Manager.hasEnoughTokens(stakeAmount);
-                if (!hasEnough) {
-                    this.showTxStatus('Insufficient token balance', 'error');
-                    return;
-                }
-
-                stakeBtn.disabled = true;
-                stakeBtn.textContent = 'Processing...';
-
-                // Generate match ID (will be provided by server in production)
-                this.currentMatchId = '0x' + Date.now().toString(16).padStart(64, '0');
-
-                this.showTxStatus('Approving and staking tokens...', 'pending');
-
-                // Stake tokens
-                const txHash = await this.web3Manager.stakeForMatch(this.currentMatchId, stakeAmount);
-
-                this.showTxStatus('Stake successful! Joining match...', 'success');
-                this.isStaked = true;
-
-                // Now join the game
-                this.joinGame();
-
-                stakeBtn.textContent = 'Staked';
-                stakeBtn.classList.add('success');
-
-            } catch (error) {
-                console.error('Error staking:', error);
-                stakeBtn.disabled = false;
-                stakeBtn.textContent = 'Stake & Join Match';
-                this.showTxStatus('Error: ' + error.message, 'error');
+                web3Container.textContent = 'connect';
             }
         });
 
         // Setup web3 event listeners
         this.web3Manager.onConnectionChange = (isConnected, account) => {
             if (!isConnected) {
-                walletInfo.classList.add('hidden');
-                stakingSection.classList.add('hidden');
-                connectWalletBtn.textContent = 'Connect Wallet';
-                connectWalletBtn.classList.remove('success');
-                connectWalletBtn.disabled = false;
+                web3Container.textContent = 'connect';
+            } else {
+                web3Container.textContent = this.web3Manager.formatAddress(account);
             }
         };
-
-        this.web3Manager.onBalanceChange = (balance) => {
-            tokenBalance.textContent = balance;
-        };
-    }
-
-    showTxStatus(message, type) {
-        const txStatus = document.getElementById('txStatus');
-        txStatus.textContent = message;
-        txStatus.className = 'web3-status status-' + type;
-        txStatus.classList.remove('hidden');
-
-        if (type === 'success' || type === 'error') {
-            setTimeout(() => {
-                txStatus.classList.add('hidden');
-            }, 5000);
-        }
     }
 
     getNetworkName(chainId) {
@@ -240,8 +153,8 @@ class Game {
         const joinData = {
             walletAddress: this.web3Manager.account,
             matchId: this.currentMatchId,
-            stakeAmount: parseFloat(document.getElementById('stakeAmount').value),
-            isStaked: this.isStaked
+            stakeAmount: 0,
+            isStaked: this.isStaked || false
         };
         this.socket.emit('joinGame', joinData);
     }
