@@ -19,13 +19,6 @@ app.use(cors());
 app.use(express.static(path.join(__dirname, '../client')));
 app.use('/assets', express.static(path.join(__dirname, '../assets')));
 
-// Game state storage
-const games = new Map();
-const players = new Map();
-
-// Match data storage (wallet addresses, stakes, etc.)
-const matchData = new Map();
-
 // ========================================
 // HITBOX CONFIGURATION
 // Adjust these values to customize hitboxes for each sprite
@@ -60,11 +53,96 @@ const HITBOX_CONFIG = {
 };
 // ========================================
 
+// Lobby logic
+class LobbyState {
+  constructor() {
+    this.players = new Map();
+    this.gameLoop = null;
+    this.isRunning = false;
+    this.lastUpdate = Date.now();
+  }
+
+  addPlayer(socketId, playerData) {
+    // Get hitbox config for this sprite type
+    const spriteType = playerData.sprite || 'player1';
+    const config = HITBOX_CONFIG[spriteType];
+
+    this.players.set(socketId, {
+      id: socketId,
+      x: playerData.x || (Math.random() * 600 + 100), // Random spawn between 100-700
+      y: playerData.y || config.yOffset,
+      width: config.width,
+      height: config.height,
+      velocityX: 0,
+      velocityY: 0,
+      onGround: true,
+      state: 'idle',
+      facing: 'right',
+      location: 'lobby',
+      currentFightId: null,
+      incomingChallenges: [],
+      outgoingChallenges: [],
+      lastChallengeTime: 0,
+      ...playerData
+    });
+  }
+
+  removePlayer(socketId) {
+    this.players.delete(socketId);
+  }
+
+  update() {
+    const now = Date.now();
+    const deltaTime = (now - this.lastUpdate) / 1000;
+    this.lastUpdate = now;
+
+    // Update each player in lobby (same physics as fight, but no combat)
+    for (let [socketId, player] of this.players) {
+      // Get sprite-specific config
+      const config = HITBOX_CONFIG[player.sprite];
+      const groundLevel = config.yOffset;
+
+      // Apply gravity
+      if (!player.onGround) {
+        player.velocityY += 800 * deltaTime;
+        if (player.velocityY > 0 && player.state !== 'takeHit') {
+          player.state = 'fall';
+        }
+      }
+
+      // Update position
+      player.x += player.velocityX * deltaTime;
+      player.y += player.velocityY * deltaTime;
+
+      // Ground collision
+      if (player.y >= groundLevel) {
+        player.y = groundLevel;
+        player.velocityY = 0;
+        player.onGround = true;
+        if (player.state === 'fall' || player.state === 'jump') {
+          player.state = player.velocityX !== 0 ? 'run' : 'idle';
+        }
+      }
+
+      // Keep players in bounds
+      if (player.x < 0) player.x = 0;
+      if (player.x > 800 - player.width) player.x = 800 - player.width;
+    }
+  }
+
+  getState() {
+    return {
+      players: Array.from(this.players.values())
+    };
+  }
+}
+
 // Game logic
 class GameState {
-  constructor(id, matchId = null) {
+  constructor(id, matchId = null, challengeData = null) {
     this.id = id;
     this.matchId = matchId; // Blockchain match ID
+    this.challengeData = challengeData; // Challenge info (wager, players, etc.)
     this.players = new Map();
     this.gameLoop = null;
     this.isRunning = false;
@@ -247,31 +325,65 @@ class GameState {
     if (this.matchResolved) return;
     this.matchResolved = true;
 
-    // If this is a blockchain match, resolve it
-    if (this.matchId) {
-      const match = matchData.get(this.matchId);
-      if (match) {
-        const winnerData = match.players.get(winner.id);
-        const loserData = match.players.get(loser.id);
+    const fightId = this.id;
 
-        if (winnerData && loserData && winnerData.walletAddress && loserData.walletAddress) {
-          console.log(`Player ${loser.id} died. Resolving match on blockchain...`);
-          resolveMatchOnChain(
-            this.matchId,
-            winnerData.walletAddress,
-            loserData.walletAddress
-          ).then(result => {
-            console.log('Match resolved successfully:', result);
-          }).catch(error => {
-            console.error('Failed to resolve match:', error);
-          });
-        } else {
-          console.log('Match ended but no wallet addresses found');
+    // If this is a blockchain match, resolve it
+    if (this.matchId || this.challengeData) {
+      // Use challengeData if available (new system), otherwise fallback to matchData (old system)
+      if (this.challengeData) {
+        console.log(`Player ${loser.id} died. Resolving challenge match on blockchain...`);
+        resolveMatchOnChain(
+          this.challengeData.id,
+          this.challengeData.challengerWallet,
+          this.challengeData.challengedWallet
+        ).then(result => {
+          console.log('Challenge match resolved successfully:', result);
+          // Return both players to lobby after blockchain resolution
+          setTimeout(() => returnPlayersToLobby(fightId), 3000); // 3 second delay
+        }).catch(error => {
+          console.error('Failed to resolve challenge match:', error);
+          // Still return players to lobby even if blockchain fails
+          setTimeout(() => returnPlayersToLobby(fightId), 3000);
+        });
+      } else if (this.matchId) {
+        const match = matchData.get(this.matchId);
+        if (match) {
+          const winnerData = match.players.get(winner.id);
+          const loserData = match.players.get(loser.id);
+
+          if (winnerData && loserData && winnerData.walletAddress && loserData.walletAddress) {
+            console.log(`Player ${loser.id} died. Resolving match on blockchain...`);
+            resolveMatchOnChain(
+              this.matchId,
+              winnerData.walletAddress,
+              loserData.walletAddress
+            ).then(result => {
+              console.log('Match resolved successfully:', result);
+              setTimeout(() => returnPlayersToLobby(fightId), 3000);
+            }).catch(error => {
+              console.error('Failed to resolve match:', error);
+              setTimeout(() => returnPlayersToLobby(fightId), 3000);
+            });
+          } else {
+            console.log('Match ended but no wallet addresses found');
+            setTimeout(() => returnPlayersToLobby(fightId), 3000);
+          }
         }
       }
+    } else {
+      // No blockchain match, just return to lobby immediately
+      console.log('Non-blockchain fight ended. Returning players to lobby.');
+      setTimeout(() => returnPlayersToLobby(fightId), 3000); // Still add delay for game over screen
     }
   }
 }
+
+// Game state storage
+const lobby = new LobbyState(); // Global lobby for up to 10 players
+const fights = new Map(); // Individual 1v1 fight instances (renamed from 'games')
+const players = new Map(); // Track player locations (lobby or fight)
+const challenges = new Map(); // Pending challenges
+const matchData = new Map(); // Match data storage (wallet addresses, stakes, etc.)
 
 // Helper function to resolve match on blockchain
 async function resolveMatchOnChain(matchId, winnerAddress, loserAddress) {
@@ -286,89 +398,424 @@ async function resolveMatchOnChain(matchId, winnerAddress, loserAddress) {
   }
 }
 
+// Helper function to return players to lobby after fight
+function returnPlayersToLobby(fightId) {
+  const fight = fights.get(fightId);
+  if (!fight) return;
+
+  const playerIds = Array.from(fight.players.keys());
+
+  playerIds.forEach(socketId => {
+    const player = fight.players.get(socketId);
+    if (!player) return;
+
+    // Reset player state for lobby
+    const randomX = Math.random() * 600 + 100;
+    const randomSprite = Math.random() < 0.5 ? 'player1' : 'player2';
+
+    lobby.addPlayer(socketId, {
+      sprite: randomSprite,
+      walletAddress: player.walletAddress
+    });
+
+    // Update player tracking
+    players.set(socketId, {
+      location: 'lobby',
+      gameId: null
+    });
+
+    // Move socket to lobby room
+    const socket = io.sockets.sockets.get(socketId);
+    if (socket) {
+      socket.leave(fightId);
+      socket.join('lobby');
+    }
+
+    // Notify client to return to lobby
+    io.to(socketId).emit('returnToLobby', {
+      lobbyState: lobby.getState()
+    });
+  });
+
+  // Clean up fight
+  if (fight.gameLoop) {
+    clearInterval(fight.gameLoop);
+  }
+  if (fight.disconnectTimeout) {
+    clearTimeout(fight.disconnectTimeout);
+  }
+  fights.delete(fightId);
+
+  // Update remaining lobby players
+  io.to('lobby').emit('lobbyState', lobby.getState());
+
+  console.log(`Players from fight ${fightId} returned to lobby`);
+}
+
+// Helper function to cancel all challenges involving a player
+function cancelPlayerChallenges(socketId) {
+  const player = lobby.players.get(socketId);
+  if (!player) return;
+
+  // Cancel all outgoing challenges
+  player.outgoingChallenges.forEach(challengeId => {
+    const challenge = challenges.get(challengeId);
+    if (challenge && challenge.status === 'pending') {
+      challenge.status = 'expired';
+      // Notify challenged player
+      io.to(challenge.challenged).emit('challengeExpired', { challengeId });
+
+      // Remove from challenged player's incoming list
+      const challengedPlayer = lobby.players.get(challenge.challenged);
+      if (challengedPlayer) {
+        challengedPlayer.incomingChallenges = challengedPlayer.incomingChallenges.filter(id => id !== challengeId);
+      }
+    }
+    challenges.delete(challengeId);
+  });
+
+  // Cancel all incoming challenges
+  player.incomingChallenges.forEach(challengeId => {
+    const challenge = challenges.get(challengeId);
+    if (challenge && challenge.status === 'pending') {
+      challenge.status = 'declined';
+      // Notify challenger
+      io.to(challenge.challenger).emit('challengeResponse', {
+        challengeId,
+        status: 'declined',
+        message: 'Player disconnected'
+      });
+
+      // Remove from challenger's outgoing list
+      const challengerPlayer = lobby.players.get(challenge.challenger);
+      if (challengerPlayer) {
+        challengerPlayer.outgoingChallenges = challengerPlayer.outgoingChallenges.filter(id => id !== challengeId);
+      }
+    }
+    challenges.delete(challengeId);
+  });
+
+  // Clear player's challenge lists
+  player.incomingChallenges = [];
+  player.outgoingChallenges = [];
+}
+
 // Socket.io event handlers
 io.on('connection', (socket) => {
   console.log('Player connected:', socket.id);
 
-  socket.on('joinGame', (data) => {
-    let game = null;
-
-    // Find an available game or create new one
-    for (let [gameId, gameState] of games) {
-      if (gameState.players.size < 2) {
-        game = gameState;
-        break;
-      }
+  socket.on('joinLobby', (data) => {
+    // Check if lobby is full (max 10 players)
+    if (lobby.players.size >= 10) {
+      socket.emit('lobbyFull', { message: 'Lobby is full. Please try again later.' });
+      return;
     }
 
-    if (!game) {
-      const gameId = Date.now().toString();
-      // Use the matchId from the first player if provided
-      const matchId = data.matchId || null;
-      game = new GameState(gameId, matchId);
-      games.set(gameId, game);
-
-      // Initialize match data for blockchain matches
-      if (matchId) {
-        matchData.set(matchId, {
-          gameId: gameId,
-          players: new Map(),
-          stakeAmount: data.stakeAmount || 0,
-          startTime: Date.now()
-        });
-      }
-    }
-
-    // Store wallet address for this player (for blockchain resolution)
-    if (data.walletAddress && game.matchId) {
-      const match = matchData.get(game.matchId);
-      if (match) {
-        match.players.set(socket.id, {
-          walletAddress: data.walletAddress,
-          stakeAmount: data.stakeAmount,
-          isStaked: data.isStaked
-        });
-      }
-    }
-
-    // Add player to game
-    const isFirstPlayer = game.players.size === 0;
+    // Assign random sprite
     const randomSprite = Math.random() < 0.5 ? 'player1' : 'player2';
-    game.addPlayer(socket.id, {
-      x: isFirstPlayer ? 100 : 700,
+
+    // Add player to lobby at random spawn position
+    lobby.addPlayer(socket.id, {
       sprite: randomSprite,
-      facing: isFirstPlayer ? 'right' : 'left',
-      walletAddress: data.walletAddress
+      walletAddress: data.walletAddress || null
     });
 
-    players.set(socket.id, game.id);
-    socket.join(game.id);
+    // Track player location
+    players.set(socket.id, {
+      location: 'lobby',
+      gameId: null
+    });
 
-    // Start game loop if not already running
-    if (!game.isRunning) {
-      game.isRunning = true;
-      game.gameLoop = setInterval(() => {
-        game.update();
-        io.to(game.id).emit('gameState', game.getState());
+    // Join lobby socket room
+    socket.join('lobby');
+
+    // Start lobby game loop if not already running
+    if (!lobby.isRunning) {
+      lobby.isRunning = true;
+      lobby.gameLoop = setInterval(() => {
+        lobby.update();
+        io.to('lobby').emit('lobbyState', lobby.getState());
       }, 1000 / 60); // 60 FPS
     }
 
-    // Send current game state
-    socket.emit('gameJoined', {
-      gameId: game.id,
+    // Send confirmation to client
+    socket.emit('lobbyJoined', {
       playerId: socket.id,
-      gameState: game.getState()
+      lobbyState: lobby.getState()
     });
+
+    console.log(`Player ${socket.id} joined lobby. Total players: ${lobby.players.size}/10`);
+  });
+
+  socket.on('sendChallenge', (data) => {
+    console.log('sendChallenge received from', socket.id, 'data:', data);
+
+    const challenger = lobby.players.get(socket.id);
+    const challenged = lobby.players.get(data.challenged);
+
+    console.log('Challenger:', challenger ? challenger.id : 'not found');
+    console.log('Challenged:', challenged ? challenged.id : 'not found');
+
+    // Validation
+    if (!challenger || !challenged) {
+      console.log('Sending challengeError: Player not found in lobby');
+      socket.emit('challengeError', { message: 'Player not found in lobby' });
+      return;
+    }
+
+    if (socket.id === data.challenged) {
+      socket.emit('challengeError', { message: 'Cannot challenge yourself' });
+      return;
+    }
+
+    // Spam prevention: max 1 challenge per 5 seconds
+    const now = Date.now();
+    if (now - challenger.lastChallengeTime < 5000) {
+      socket.emit('challengeError', { message: 'Please wait before sending another challenge' });
+      return;
+    }
+
+    // Max 3 outgoing challenges at once
+    if (challenger.outgoingChallenges.length >= 3) {
+      socket.emit('challengeError', { message: 'Too many pending challenges. Wait for responses.' });
+      return;
+    }
+
+    // Max 5 incoming challenges for target player
+    if (challenged.incomingChallenges.length >= 5) {
+      socket.emit('challengeError', { message: 'Player has too many pending challenges' });
+      return;
+    }
+
+    // Check for mutual challenges
+    const mutualChallenge = challenges.get(challenged.outgoingChallenges.find(id => {
+      const ch = challenges.get(id);
+      return ch && ch.challenged === socket.id && ch.status === 'pending';
+    }));
+    if (mutualChallenge) {
+      socket.emit('challengeError', { message: 'Player already challenged you' });
+      return;
+    }
+
+    // Create challenge
+    const challengeId = `${socket.id}-${data.challenged}-${now}`;
+    const challenge = {
+      id: challengeId,
+      challenger: socket.id,
+      challenged: data.challenged,
+      wagerAmount: data.wagerAmount || 0,
+      status: 'pending',
+      timestamp: now,
+      expiresAt: now + 30000, // 30 seconds
+      challengerWallet: challenger.walletAddress,
+      challengedWallet: challenged.walletAddress
+    };
+
+    challenges.set(challengeId, challenge);
+    challenger.outgoingChallenges.push(challengeId);
+    challenged.incomingChallenges.push(challengeId);
+    challenger.lastChallengeTime = now;
+
+    // Send challenge to challenged player
+    io.to(data.challenged).emit('challengeReceived', {
+      challengeId: challenge.id,
+      challenger: socket.id,
+      challengerWallet: challenger.walletAddress,
+      wagerAmount: challenge.wagerAmount
+    });
+
+    // Confirm to challenger
+    socket.emit('challengeSent', { challengeId });
+
+    // Set expiration timer
+    setTimeout(() => {
+      const ch = challenges.get(challengeId);
+      if (ch && ch.status === 'pending') {
+        ch.status = 'expired';
+
+        // Notify both players
+        io.to(ch.challenger).emit('challengeExpired', { challengeId });
+        io.to(ch.challenged).emit('challengeExpired', { challengeId });
+
+        // Clean up challenge lists
+        const challengerPlayer = lobby.players.get(ch.challenger);
+        const challengedPlayer = lobby.players.get(ch.challenged);
+        if (challengerPlayer) {
+          challengerPlayer.outgoingChallenges = challengerPlayer.outgoingChallenges.filter(id => id !== challengeId);
+        }
+        if (challengedPlayer) {
+          challengedPlayer.incomingChallenges = challengedPlayer.incomingChallenges.filter(id => id !== challengeId);
+        }
+
+        challenges.delete(challengeId);
+      }
+    }, 30000);
+
+    console.log(`Challenge ${challengeId}: ${socket.id} challenged ${data.challenged} for ${challenge.wagerAmount} tokens`);
+  });
+
+  socket.on('acceptChallenge', (data) => {
+    const challenge = challenges.get(data.challengeId);
+
+    // Validation
+    if (!challenge) {
+      socket.emit('challengeError', { message: 'Challenge not found' });
+      return;
+    }
+
+    if (challenge.challenged !== socket.id) {
+      socket.emit('challengeError', { message: 'Not your challenge to accept' });
+      return;
+    }
+
+    if (challenge.status !== 'pending') {
+      socket.emit('challengeError', { message: 'Challenge no longer available' });
+      return;
+    }
+
+    if (Date.now() > challenge.expiresAt) {
+      socket.emit('challengeError', { message: 'Challenge expired' });
+      challenge.status = 'expired';
+      return;
+    }
+
+    // Mark challenge as accepted
+    challenge.status = 'accepted';
+
+    // Get both players
+    const challenger = lobby.players.get(challenge.challenger);
+    const challenged = lobby.players.get(challenge.challenged);
+
+    if (!challenger || !challenged) {
+      socket.emit('challengeError', { message: 'Player no longer in lobby' });
+      return;
+    }
+
+    // Create fight instance
+    const fightId = `fight-${Date.now()}`;
+    const fight = new GameState(fightId, challenge.id, challenge);
+
+    // Add both players to fight
+    const randomSprite1 = Math.random() < 0.5 ? 'player1' : 'player2';
+    const randomSprite2 = randomSprite1 === 'player1' ? 'player2' : 'player1';
+
+    fight.addPlayer(challenge.challenger, {
+      x: 100,
+      sprite: randomSprite1,
+      facing: 'right',
+      walletAddress: challenger.walletAddress
+    });
+
+    fight.addPlayer(challenge.challenged, {
+      x: 700,
+      sprite: randomSprite2,
+      facing: 'left',
+      walletAddress: challenged.walletAddress
+    });
+
+    // Remove both players from lobby
+    lobby.removePlayer(challenge.challenger);
+    lobby.removePlayer(challenge.challenged);
+
+    // Update player tracking
+    players.set(challenge.challenger, { location: 'fight', gameId: fightId });
+    players.set(challenge.challenged, { location: 'fight', gameId: fightId });
+
+    // Clear all challenges for both players
+    cancelPlayerChallenges(challenge.challenger);
+    cancelPlayerChallenges(challenge.challenged);
+
+    // Store fight
+    fights.set(fightId, fight);
+
+    // Start fight loop
+    fight.isRunning = true;
+    fight.gameLoop = setInterval(() => {
+      fight.update();
+      io.to(fightId).emit('gameState', fight.getState());
+    }, 1000 / 60);
+
+    // Move players to fight room
+    const challengerSocket = io.sockets.sockets.get(challenge.challenger);
+    const challengedSocket = io.sockets.sockets.get(challenge.challenged);
+    if (challengerSocket) challengerSocket.leave('lobby');
+    if (challengedSocket) challengedSocket.leave('lobby');
+    if (challengerSocket) challengerSocket.join(fightId);
+    if (challengedSocket) challengedSocket.join(fightId);
+
+    // Notify both players
+    io.to(fightId).emit('fightStarting', {
+      fightId,
+      gameState: fight.getState(),
+      wagerAmount: challenge.wagerAmount
+    });
+
+    // Update lobby for remaining players
+    io.to('lobby').emit('lobbyState', lobby.getState());
+
+    console.log(`Fight ${fightId} started: ${challenge.challenger} vs ${challenge.challenged}`);
+  });
+
+  socket.on('declineChallenge', (data) => {
+    const challenge = challenges.get(data.challengeId);
+
+    // Validation
+    if (!challenge) {
+      socket.emit('challengeError', { message: 'Challenge not found' });
+      return;
+    }
+
+    if (challenge.challenged !== socket.id) {
+      socket.emit('challengeError', { message: 'Not your challenge to decline' });
+      return;
+    }
+
+    if (challenge.status !== 'pending') {
+      return; // Already handled
+    }
+
+    // Mark as declined
+    challenge.status = 'declined';
+
+    // Notify challenger
+    io.to(challenge.challenger).emit('challengeResponse', {
+      challengeId: data.challengeId,
+      status: 'declined'
+    });
+
+    // Clean up challenge lists
+    const challenger = lobby.players.get(challenge.challenger);
+    const challenged = lobby.players.get(challenge.challenged);
+
+    if (challenger) {
+      challenger.outgoingChallenges = challenger.outgoingChallenges.filter(id => id !== data.challengeId);
+    }
+    if (challenged) {
+      challenged.incomingChallenges = challenged.incomingChallenges.filter(id => id !== data.challengeId);
+    }
+
+    challenges.delete(data.challengeId);
+
+    console.log(`Challenge ${data.challengeId} declined by ${socket.id}`);
   });
 
   socket.on('playerInput', (data) => {
-    const gameId = players.get(socket.id);
-    if (!gameId) return;
+    const playerInfo = players.get(socket.id);
+    if (!playerInfo) return;
 
-    const game = games.get(gameId);
-    if (!game) return;
+    // Handle input based on player location
+    let game, player;
+    if (playerInfo.location === 'lobby') {
+      game = lobby;
+      player = lobby.players.get(socket.id);
+    } else if (playerInfo.location === 'fight') {
+      game = fights.get(playerInfo.gameId);
+      if (!game) return;
+      player = game.players.get(socket.id);
+    } else {
+      return;
+    }
 
-    const player = game.players.get(socket.id);
     if (!player) return;
 
 
@@ -430,9 +877,24 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('Player disconnected:', socket.id);
 
-    const gameId = players.get(socket.id);
-    if (gameId) {
-      const game = games.get(gameId);
+    const playerInfo = players.get(socket.id);
+    if (!playerInfo) return;
+
+    if (playerInfo.location === 'lobby') {
+      // Handle lobby disconnect
+      lobby.removePlayer(socket.id);
+
+      // Cancel all challenges involving this player
+      cancelPlayerChallenges(socket.id);
+
+      // Notify other players in lobby
+      io.to('lobby').emit('lobbyState', lobby.getState());
+
+      console.log(`Player ${socket.id} left lobby. Remaining players: ${lobby.players.size}/10`);
+
+    } else if (playerInfo.location === 'fight') {
+      // Handle fight disconnect
+      const game = fights.get(playerInfo.gameId);
       if (game) {
         // If this is a blockchain match with 2 players, start disconnect timeout
         if (game.matchId && game.players.size === 2 && !game.matchResolved) {
@@ -440,7 +902,7 @@ io.on('connection', (socket) => {
           const remainingPlayer = Array.from(game.players.values()).find(p => p.id !== socket.id);
 
           if (disconnectedPlayer && remainingPlayer) {
-            console.log(`Player ${socket.id} disconnected. Starting 30s timeout...`);
+            console.log(`Player ${socket.id} disconnected from fight. Starting 30s timeout...`);
 
             // Start timeout - if disconnected player doesn't reconnect in 30s, award match to remaining player
             game.disconnectTimeout = setTimeout(() => {
@@ -457,8 +919,7 @@ io.on('connection', (socket) => {
         // Immediately send updated game state to remaining players
         io.to(game.id).emit('gameState', game.getState());
 
-        // Keep game loop running even with 1 player (for waiting room)
-        // Only stop if no players left
+        // Clean up fight if no players left
         if (game.players.size === 0) {
           if (game.gameLoop) {
             clearInterval(game.gameLoop);
@@ -467,10 +928,12 @@ io.on('connection', (socket) => {
           if (game.disconnectTimeout) {
             clearTimeout(game.disconnectTimeout);
           }
+          fights.delete(game.id);
         }
       }
-      players.delete(socket.id);
     }
+
+    players.delete(socket.id);
   });
 });
 

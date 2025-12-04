@@ -42,7 +42,10 @@ class Game {
         this.spriteManager = new SpriteManager();
         this.inputManager = null;
 
+        // Scene management
+        this.currentScene = 'waiting'; // 'lobby' | 'fight' | 'waiting'
         this.gameState = null;
+        this.lobbyState = null;
         this.playerId = null;
         this.gameId = null;
 
@@ -57,6 +60,9 @@ class Game {
         this.web3Manager = new Web3Manager();
         this.isStaked = false;
         this.currentMatchId = null;
+
+        // Lobby UI
+        this.lobbyUI = null;
 
         this.setupWeb3UI();
         this.setupSocketEvents();
@@ -79,8 +85,8 @@ class Game {
                 // Update UI with abbreviated address
                 web3Container.textContent = this.web3Manager.formatAddress(this.web3Manager.account);
 
-                // Automatically join the game after connecting
-                this.joinGame();
+                // Automatically join the lobby after connecting
+                this.joinLobby();
             } catch (error) {
                 console.error('Error connecting wallet:', error);
                 web3Container.textContent = 'connect';
@@ -147,16 +153,102 @@ class Game {
             console.log('Disconnected from server');
             this.isGameRunning = false;
         });
+
+        // Lobby socket events
+        this.socket.on('lobbyJoined', (data) => {
+            console.log('Joined lobby:', data);
+            this.currentScene = 'lobby';
+            this.playerId = data.playerId;
+            this.lobbyState = data.lobbyState;
+
+            // Create lobby UI
+            this.lobbyUI = new LobbyUI(this.socket, this.playerId);
+            this.lobbyUI.show();
+            this.lobbyUI.updatePlayerList(data.lobbyState.players);
+        });
+
+        this.socket.on('lobbyState', (state) => {
+            if (this.currentScene === 'lobby') {
+                this.lobbyState = state;
+                if (this.lobbyUI) {
+                    this.lobbyUI.updatePlayerList(state.players);
+                }
+            }
+        });
+
+        this.socket.on('lobbyFull', (data) => {
+            alert(data.message);
+        });
+
+        this.socket.on('challengeReceived', (challenge) => {
+            if (this.lobbyUI) {
+                this.lobbyUI.addIncomingChallenge(challenge);
+                this.lobbyUI.showToast(`New challenge from ${challenge.challengerWallet ? challenge.challengerWallet.slice(0, 6) + '...' : 'a player'}!`);
+            }
+        });
+
+        this.socket.on('challengeResponse', (response) => {
+            if (this.lobbyUI) {
+                if (response.status === 'accepted') {
+                    this.lobbyUI.showToast('Challenge accepted! Preparing fight...', 2000);
+                } else if (response.status === 'declined') {
+                    this.lobbyUI.showToast(response.message || 'Challenge declined', 2000);
+                }
+            }
+        });
+
+        this.socket.on('challengeExpired', (data) => {
+            if (this.lobbyUI) {
+                this.lobbyUI.removeChallenge(data.challengeId);
+                this.lobbyUI.showToast('Challenge expired', 2000);
+            }
+        });
+
+        this.socket.on('challengeError', (data) => {
+            if (this.lobbyUI) {
+                this.lobbyUI.showToast(`Error: ${data.message}`, 3000);
+            }
+        });
+
+        this.socket.on('challengeSent', (data) => {
+            console.log('Challenge sent:', data);
+        });
+
+        this.socket.on('fightStarting', (data) => {
+            console.log('Fight starting:', data);
+            this.currentScene = 'fight';
+            this.gameState = data.gameState;
+            this.gameId = data.fightId;
+            this.isGameRunning = true;
+            this.isWaitingRoom = false;
+
+            // Hide lobby UI
+            if (this.lobbyUI) {
+                this.lobbyUI.hide();
+            }
+        });
+
+        this.socket.on('returnToLobby', (data) => {
+            console.log('Returning to lobby:', data);
+            this.currentScene = 'lobby';
+            this.lobbyState = data.lobbyState;
+            this.isGameRunning = false;
+            this.isWaitingRoom = false;
+
+            // Show lobby UI
+            if (this.lobbyUI) {
+                this.lobbyUI.show();
+                this.lobbyUI.updatePlayerList(data.lobbyState.players);
+                this.lobbyUI.showToast('Returned to lobby', 2000);
+            }
+        });
     }
 
-    joinGame() {
+    joinLobby() {
         const joinData = {
-            walletAddress: this.web3Manager.account,
-            matchId: this.currentMatchId,
-            stakeAmount: 0,
-            isStaked: this.isStaked || false
+            walletAddress: this.web3Manager.account
         };
-        this.socket.emit('joinGame', joinData);
+        this.socket.emit('joinLobby', joinData);
     }
 
 
@@ -178,10 +270,17 @@ class Game {
         // Clear canvas
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        if (this.isWaitingRoom) {
-            this.drawWaitingRoom();
-        } else {
-            this.drawFightingScene();
+        switch (this.currentScene) {
+            case 'lobby':
+                this.drawLobbyScene();
+                break;
+            case 'fight':
+                this.drawFightingScene();
+                break;
+            case 'waiting':
+            default:
+                this.drawWaitingRoom();
+                break;
         }
     }
 
@@ -209,6 +308,33 @@ class Game {
         // Draw players (if any)
         if (this.gameState) {
             this.gameState.players.forEach(player => {
+                this.drawPlayer(player);
+            });
+        }
+    }
+
+    drawLobbyScene() {
+        // Same background as other scenes
+        this.ctx.fillStyle = '#4A90E2';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height / 2);
+
+        this.ctx.fillStyle = '#7B9E89';
+        this.ctx.fillRect(0, this.canvas.height / 2, this.canvas.width, this.canvas.height / 2);
+
+        // Draw lobby title
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = '36px Arial';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText('LOBBY', 20, 50);
+
+        // Draw player count
+        const playerCount = this.lobbyState ? this.lobbyState.players.length : 0;
+        this.ctx.font = '18px Arial';
+        this.ctx.fillText(`Players: ${playerCount}/10`, 20, 85);
+
+        // Draw all lobby players with movement
+        if (this.lobbyState && this.lobbyState.players) {
+            this.lobbyState.players.forEach(player => {
                 this.drawPlayer(player);
             });
         }
