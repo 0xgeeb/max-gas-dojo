@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import { SafeTransferLib } from "../lib/solady/src/utils/SafeTransferLib.sol";
+
 contract WizardsCentralEscrow {
 
     struct Match {
@@ -24,7 +26,7 @@ contract WizardsCentralEscrow {
     mapping(uint256 => Match) public matches;
 
     function createMatch(address opponent, uint256 bet) external {
-        // SafeTransferLib.safeTransferFrom(wc, msg.sender, address(this), bet);
+        SafeTransferLib.safeTransferFrom(wc, msg.sender, address(this), bet);
         Match memory newMatch = Match({
             player: msg.sender,
             opponent: opponent,
@@ -40,7 +42,7 @@ contract WizardsCentralEscrow {
         Match storage matchToAccept = matches[id];
         if(matchToAccept.accepted || matchToAccept.resolved) revert InvalidMatchState();
         if(msg.sender != matchToAccept.opponent) revert NotOpponent();
-        // SafeTransferLib.safeTransferFrom(wc, msg.sender, address(this), bet);
+        SafeTransferLib.safeTransferFrom(wc, msg.sender, address(this), matchToAccept.bet);
         matchToAccept.accepted = true;
     }
 
@@ -51,6 +53,6 @@ contract WizardsCentralEscrow {
         if(winner != matchToResolve.player && winner != matchToResolve.opponent) revert NotOpponent();
         matchToResolve.winner = winner;
         matchToResolve.resolved = true;
-        // SafeTransferLib.safeTransfer(wc, winner, matchToResolve.bet * 2);
+        SafeTransferLib.safeTransfer(wc, winner, matchToResolve.bet * 2);
     }
 }
