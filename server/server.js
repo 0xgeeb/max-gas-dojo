@@ -3,6 +3,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const serverWeb3Manager = require('./web3');
 
 const app = express();
@@ -16,7 +17,19 @@ const io = socketIo(server, {
 
 // Middleware
 app.use(cors());
-app.use(express.static(path.join(__dirname, '../client')));
+
+// Serve static files from built React app if it exists, otherwise serve old client
+const distPath = path.join(__dirname, '../client/dist');
+const clientPath = path.join(__dirname, '../client');
+
+if (fs.existsSync(distPath)) {
+  console.log('Serving built React app from:', distPath);
+  app.use(express.static(distPath));
+} else {
+  console.log('Built app not found. Serving from:', clientPath);
+  app.use(express.static(clientPath));
+}
+
 app.use('/assets', express.static(path.join(__dirname, '../assets')));
 
 // ========================================
