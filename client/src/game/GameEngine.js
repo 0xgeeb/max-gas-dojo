@@ -305,11 +305,14 @@ export class GameEngine {
 
     drawLobbyScene() {
         // Same background as other scenes
-        this.ctx.fillStyle = '#4A90E2';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height / 2);
+        // this.ctx.fillStyle = '#4A90E2';
+        // this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height / 2);
 
-        this.ctx.fillStyle = '#7B9E89';
-        this.ctx.fillRect(0, this.canvas.height / 2, this.canvas.width, this.canvas.height / 2);
+        // this.ctx.fillStyle = '#7B9E89';
+        // this.ctx.fillRect(0, this.canvas.height / 2, this.canvas.width, this.canvas.height / 2);
+
+        const lobbybgSprite = this.spriteManager.sprites['lobbybg']
+        this.ctx.drawImage(lobbybgSprite, 0, 0, this.canvas.width, this.canvas.height)
 
         // todo: these should be in the react files
         // Draw lobby title
@@ -333,11 +336,14 @@ export class GameEngine {
 
     drawFightingScene() {
         // Fighting scene background
-        this.ctx.fillStyle = '#4A90E2';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height / 2);
+        // this.ctx.fillStyle = '#4A90E2';
+        // this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height / 2);
 
-        this.ctx.fillStyle = '#7B9E89';
-        this.ctx.fillRect(0, this.canvas.height / 2, this.canvas.width, this.canvas.height / 2);
+        // this.ctx.fillStyle = '#7B9E89';
+        // this.ctx.fillRect(0, this.canvas.height / 2, this.canvas.width, this.canvas.height / 2);
+        
+        const arenabgSprite = this.spriteManager.sprites['arenabg']
+        this.ctx.drawImage(arenabgSprite, 0, 0, this.canvas.width, this.canvas.height)
 
         // Draw players
         if (this.gameState) {

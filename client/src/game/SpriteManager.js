@@ -39,6 +39,10 @@ export class SpriteManager {
         this.loadSprite('takeHit2', '/assets/Martial Hero 2/Sprites/Take hit.png');
         this.loadSprite('death2', '/assets/Martial Hero 2/Sprites/Death.png');
         this.loadSprite('fall2', '/assets/Martial Hero 2/Sprites/Fall.png');
+
+        // Load background sprites
+        this.loadSprite('lobbybg', '/assets/lobby.jpg');
+        this.loadSprite('arenabg', '/assets/arena.jpg');
     }
 
     getSprite(state, playerId) {
