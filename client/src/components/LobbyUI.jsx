@@ -48,10 +48,10 @@ export default function LobbyUI({ gameEngine, lobbyState, playerId }) {
     return (
         <>
             {/* Player List Sidebar */}
-            <div className="absolute top-0 right-0 w-[250px] h-screen bg-black/85 text-white overflow-y-auto p-5 box-border z-[100]">
-                <div className="flex justify-between mb-5 pb-2.5 border-b-2 border-blue-500">
+            <div className="absolute top-0 left-0 w-[250px] h-screen bg-transparent text-white overflow-y-auto p-5 z-[100]">
+                <div className="flex justify-between mb-5 pb-2.5 border-b-2 border-white">
                     <h3 className="m-0 text-lg">Players in Lobby</h3>
-                    <span className="text-blue-500 font-bold">
+                    <span className="text-white font-bold">
                         {lobbyState?.players?.length || 0}/10
                     </span>
                 </div>

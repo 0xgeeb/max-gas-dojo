@@ -281,18 +281,19 @@ export class GameEngine {
         this.ctx.fillStyle = '#7B9E89';
         this.ctx.fillRect(0, this.canvas.height / 2, this.canvas.width, this.canvas.height / 2);
 
+        // todo: these should be in the react files
         // Draw waiting room text
-        this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.font = '48px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('WAITING ROOM', this.canvas.width / 2, 150);
+        // this.ctx.fillStyle = '#FFFFFF';
+        // this.ctx.font = '48px Arial';
+        // this.ctx.textAlign = 'center';
+        // this.ctx.fillText('WAITING ROOM', this.canvas.width / 2, 150);
 
-        this.ctx.font = '24px Arial';
-        this.ctx.fillText('Waiting for another player to join...', this.canvas.width / 2, 200);
+        // this.ctx.font = '24px Arial';
+        // this.ctx.fillText('Waiting for another player to join...', this.canvas.width / 2, 200);
 
         // Draw player count
-        const playerCount = this.gameState ? this.gameState.players.length : 0;
-        this.ctx.fillText(`Players: ${playerCount}/2`, this.canvas.width / 2, 250);
+        // const playerCount = this.gameState ? this.gameState.players.length : 0;
+        // this.ctx.fillText(`Players: ${playerCount}/2`, this.canvas.width / 2, 250);
 
         // Draw players (if any)
         if (this.gameState) {
@@ -310,16 +311,17 @@ export class GameEngine {
         this.ctx.fillStyle = '#7B9E89';
         this.ctx.fillRect(0, this.canvas.height / 2, this.canvas.width, this.canvas.height / 2);
 
+        // todo: these should be in the react files
         // Draw lobby title
-        this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.font = '36px Arial';
-        this.ctx.textAlign = 'left';
-        this.ctx.fillText('LOBBY', 20, 50);
+        // this.ctx.fillStyle = '#FFFFFF';
+        // this.ctx.font = '36px Arial';
+        // this.ctx.textAlign = 'left';
+        // this.ctx.fillText('LOBBY', 20, 50);
 
-        // Draw player count
-        const playerCount = this.lobbyState ? this.lobbyState.players.length : 0;
-        this.ctx.font = '18px Arial';
-        this.ctx.fillText(`Players: ${playerCount}/10`, 20, 85);
+        // // Draw player count
+        // const playerCount = this.lobbyState ? this.lobbyState.players.length : 0;
+        // this.ctx.font = '18px Arial';
+        // this.ctx.fillText(`Players: ${playerCount}/10`, 20, 85);
 
         // Draw all lobby players with movement
         if (this.lobbyState && this.lobbyState.players) {
