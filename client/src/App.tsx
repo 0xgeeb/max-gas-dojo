@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import Game from './components/Game.jsx';
-import WalletButton from './components/WalletButton.jsx';
-import LobbyUI from './components/LobbyUI.jsx';
-import Toast from './components/Toast.jsx';
-import WelcomeScreen from './components/WelcomeScreen.jsx';
+import Game from './components/Game.tsx';
+import WalletButton from './components/WalletButton.tsx';
+import LobbyUI from './components/LobbyUI.tsx';
+import Toast from './components/Toast.tsx';
+import WelcomeScreen from './components/WelcomeScreen.tsx';
 
 function App() {
     const [gameEngine, setGameEngine] = useState(null);
