@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export default function LobbyUI({ gameEngine, lobbyState, playerId }) {
+export const LobbyUI = ({ gameEngine, lobbyState, playerId }) => {
     const [incomingChallenges, setIncomingChallenges] = useState([]);
 
     useEffect(() => {

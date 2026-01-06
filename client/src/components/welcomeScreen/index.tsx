@@ -1,30 +1,24 @@
-import { useState } from 'react';
+"use client"
 
-export default function WelcomeScreen({ gameEngine, onEnterLobby }) {
-    const [isConnecting, setIsConnecting] = useState(false);
-    const [walletAddress, setWalletAddress] = useState(null);
+import { useConnection } from "wagmi"
+import { useWallet } from '../../providers';
+
+export const WelcomeScreen = ({ gameEngine }) => {
+    const { connectWallet } = useWallet();
+    const { address, isConnecting } = useConnection()
 
     const handleConnectWallet = async () => {
-        if (!gameEngine) return;
-
-        setIsConnecting(true);
         try {
-            const address = await gameEngine.connectWallet();
-            setWalletAddress(address);
+            await connectWallet();
         } catch (error) {
             console.error('Failed to connect wallet:', error);
-        } finally {
-            setIsConnecting(false);
         }
     };
 
     const handleEnterLobby = () => {
-        if (!gameEngine) return;
+        if (!gameEngine || !address) return;
 
-        gameEngine.joinLobby();
-        if (onEnterLobby) {
-            onEnterLobby();
-        }
+        gameEngine.joinLobby(address);
     };
 
     return (
@@ -58,7 +52,7 @@ export default function WelcomeScreen({ gameEngine, onEnterLobby }) {
 
                 {/* Wallet Connection */}
                 <div className="space-y-4">
-                    {!walletAddress ? (
+                    {!address ? (
                         <button
                             onClick={handleConnectWallet}
                             disabled={isConnecting}
@@ -72,7 +66,7 @@ export default function WelcomeScreen({ gameEngine, onEnterLobby }) {
                     ) : (
                         <div className="space-y-4">
                             <div className="text-green-400 text-sm font-mono bg-black/30 rounded-lg px-4 py-2 inline-block">
-                                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                                {`${address.slice(0, 6)}...${address.slice(-4)}`}
                             </div>
                             <button
                                 onClick={handleEnterLobby}

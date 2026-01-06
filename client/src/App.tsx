@@ -1,9 +1,15 @@
 import { useState } from 'react';
-import Game from './components/Game.tsx';
-import WalletButton from './components/WalletButton.tsx';
-import LobbyUI from './components/LobbyUI.tsx';
-import Toast from './components/Toast.tsx';
-import WelcomeScreen from './components/WelcomeScreen.tsx';
+import {
+    Game,
+    WalletButton,
+    LobbyUI,
+    Toast,
+    WelcomeScreen
+} from "./components"
+import {
+    WagmiProvider,
+    WalletProvider
+} from "./providers"
 
 function App() {
     const [gameEngine, setGameEngine] = useState(null);
@@ -32,45 +38,45 @@ function App() {
     };
 
     return (
-        <div className="relative w-screen h-screen overflow-hidden bg-sky-400">
-            {/* Welcome Screen - shown only on welcome scene */}
-            {currentScene === 'welcome' && (
-                <WelcomeScreen gameEngine={gameEngine} />
-            )}
+        <WagmiProvider>
+            <WalletProvider>
+                <div className="relative w-screen h-screen overflow-hidden bg-sky-400">
+                    {currentScene === 'welcome' && (
+                        <WelcomeScreen gameEngine={gameEngine} />
+                    )}
 
-            {/* Game Canvas - always mounted but hidden on welcome screen */}
-            <div className={currentScene === 'welcome' ? 'hidden' : ''}>
-                <Game
-                    onSceneChange={handleSceneChange}
-                    onLobbyStateChange={handleLobbyStateChange}
-                    onToastMessage={handleToastMessage}
-                    setGameEngine={setGameEngine}
-                />
-            </div>
+                    <div className={currentScene === 'welcome' ? 'hidden' : ''}>
+                        <Game
+                            onSceneChange={handleSceneChange}
+                            onLobbyStateChange={handleLobbyStateChange}
+                            onToastMessage={handleToastMessage}
+                            setGameEngine={setGameEngine}
+                        />
+                    </div>
 
-            {/* Wallet Button - shown only in lobby and fight scenes */}
-            {(currentScene === 'lobby' || currentScene === 'fight') && (
-                <WalletButton gameEngine={gameEngine} />
-            )}
+                    {currentScene === 'lobby' && (
+                        <WalletButton gameEngine={gameEngine} />
+                    )}
 
-            {/* Lobby UI - shown only in lobby scene */}
-            {currentScene === 'lobby' && lobbyState && (
-                <LobbyUI
-                    gameEngine={gameEngine}
-                    lobbyState={lobbyState}
-                    playerId={playerId}
-                />
-            )}
-
-            {/* Toast notifications */}
-            {toastMessage && (
-                <Toast
-                    message={toastMessage}
-                    duration={3000}
-                    onClose={handleToastClose}
-                />
-            )}
-        </div>
+                    {currentScene === 'lobby' && lobbyState && (
+                        <LobbyUI
+                            gameEngine={gameEngine}
+                            lobbyState={lobbyState}
+                            playerId={playerId}
+                        />
+                    )}
+                    
+                    {/* todo: change to better looking messages */}
+                    {toastMessage && (
+                        <Toast
+                            message={toastMessage}
+                            duration={3000}
+                            onClose={handleToastClose}
+                        />
+                    )}
+                </div>
+            </WalletProvider>
+        </WagmiProvider>
     );
 }
 

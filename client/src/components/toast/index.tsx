@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export default function Toast({ message, duration = 3000, onClose }) {
+export const Toast = ({ message, duration = 3000, onClose }) => {
     const [visible, setVisible] = useState(!!message);
 
     useEffect(() => {

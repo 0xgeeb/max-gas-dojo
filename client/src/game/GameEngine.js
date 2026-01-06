@@ -1,7 +1,6 @@
 import { io } from 'socket.io-client';
 import { SpriteManager, AnimatedSprite } from './SpriteManager.js';
 import { InputManager } from './InputManager.js';
-import { Web3Manager } from './Web3Manager.js';
 
 // Hitbox configuration - must match server
 const HITBOX_CONFIG = {
@@ -35,7 +34,6 @@ export class GameEngine {
 
         this.spriteManager = new SpriteManager();
         this.inputManager = null;
-        this.web3Manager = new Web3Manager();
 
         // Scene management
         this.currentScene = 'welcome'; // 'welcome' | 'lobby' | 'fight'
@@ -53,7 +51,6 @@ export class GameEngine {
         // Callbacks for React components
         this.onSceneChange = null;
         this.onLobbyStateChange = null;
-        this.onWalletChange = null;
         this.onChallengeReceived = null;
         this.onToastMessage = null;
 
@@ -178,13 +175,9 @@ export class GameEngine {
     }
 
     // Public methods for React to call
-    connectWallet() {
-        return this.web3Manager.connectWallet();
-    }
-
-    joinLobby() {
+    joinLobby(walletAddress) {
         const joinData = {
-            walletAddress: this.web3Manager.account
+            walletAddress: walletAddress
         };
         this.socket.emit('joinLobby', joinData);
     }
@@ -424,14 +417,6 @@ export class GameEngine {
     }
 
     // Getters for React components
-    getWalletAddress() {
-        return this.web3Manager.account;
-    }
-
-    isWalletConnected() {
-        return this.web3Manager.isConnected;
-    }
-
     getCurrentScene() {
         return this.currentScene;
     }
