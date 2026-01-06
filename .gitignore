@@ -4,4 +4,6 @@
 /contracts/lib
 /contracts/cache
 /contracts/out
-.env
+/server/.env
+/client/.env
+/contracts/.env

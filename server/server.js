@@ -30,7 +30,7 @@ if (fs.existsSync(distPath)) {
   app.use(express.static(clientPath));
 }
 
-app.use('/assets', express.static(path.join(__dirname, '../assets')));
+app.use('/assets', express.static(path.join(__dirname, '../client/assets')));
 
 // ========================================
 // HITBOX CONFIGURATION

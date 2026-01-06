@@ -38,7 +38,7 @@ export class GameEngine {
         this.web3Manager = new Web3Manager();
 
         // Scene management
-        this.currentScene = 'waiting'; // 'lobby' | 'fight' | 'waiting'
+        this.currentScene = 'welcome'; // 'welcome' | 'lobby' | 'fight'
         this.gameState = null;
         this.lobbyState = null;
         this.playerId = null;
@@ -46,7 +46,6 @@ export class GameEngine {
 
         this.lastTime = 0;
         this.isGameRunning = false;
-        this.isWaitingRoom = true;
 
         // Store animated sprites separately
         this.playerSprites = new Map();
@@ -69,25 +68,8 @@ export class GameEngine {
         // Create input manager immediately after socket connection
         this.inputManager = new InputManager(this.socket);
 
-        this.socket.on('gameJoined', (data) => {
-            console.log('Joined game:', data);
-            this.gameId = data.gameId;
-            this.playerId = data.playerId;
-            this.gameState = data.gameState;
-        });
-
         this.socket.on('gameState', (state) => {
             this.gameState = state;
-            // Check if we should transition from waiting room to fighting
-            if (this.isWaitingRoom && state.players && state.players.length >= 2) {
-                this.isWaitingRoom = false;
-                this.isGameRunning = true;
-            }
-            // Check if we should transition back to waiting room
-            if (!this.isWaitingRoom && state.players && state.players.length < 2) {
-                this.isWaitingRoom = true;
-                this.isGameRunning = false;
-            }
         });
 
         this.socket.on('disconnect', () => {
@@ -164,7 +146,6 @@ export class GameEngine {
             this.gameState = data.gameState;
             this.gameId = data.fightId;
             this.isGameRunning = true;
-            this.isWaitingRoom = false;
 
             if (this.onSceneChange) {
                 this.onSceneChange('fight');
@@ -176,7 +157,6 @@ export class GameEngine {
             this.currentScene = 'lobby';
             this.lobbyState = data.lobbyState;
             this.isGameRunning = false;
-            this.isWaitingRoom = false;
 
             if (this.onSceneChange) {
                 this.onSceneChange('lobby');
@@ -266,40 +246,9 @@ export class GameEngine {
             case 'fight':
                 this.drawFightingScene();
                 break;
-            case 'waiting':
             default:
-                this.drawWaitingRoom();
+                // Welcome screen is now a React component, so just clear canvas
                 break;
-        }
-    }
-
-    drawWaitingRoom() {
-        // Waiting room background
-        this.ctx.fillStyle = '#4A90E2';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height / 2);
-
-        this.ctx.fillStyle = '#7B9E89';
-        this.ctx.fillRect(0, this.canvas.height / 2, this.canvas.width, this.canvas.height / 2);
-
-        // todo: these should be in the react files
-        // Draw waiting room text
-        // this.ctx.fillStyle = '#FFFFFF';
-        // this.ctx.font = '48px Arial';
-        // this.ctx.textAlign = 'center';
-        // this.ctx.fillText('WAITING ROOM', this.canvas.width / 2, 150);
-
-        // this.ctx.font = '24px Arial';
-        // this.ctx.fillText('Waiting for another player to join...', this.canvas.width / 2, 200);
-
-        // Draw player count
-        // const playerCount = this.gameState ? this.gameState.players.length : 0;
-        // this.ctx.fillText(`Players: ${playerCount}/2`, this.canvas.width / 2, 250);
-
-        // Draw players (if any)
-        if (this.gameState) {
-            this.gameState.players.forEach(player => {
-                this.drawPlayer(player);
-            });
         }
     }
 
