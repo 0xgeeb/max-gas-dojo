@@ -1,11 +1,16 @@
 "use client"
 
+import { useEffect } from "react";
 import { useConnection } from "wagmi"
 import { useWallet } from '../../providers';
 
 export const WelcomeScreen = ({ gameEngine }) => {
-    const { connectWallet } = useWallet();
+    const { refreshWc, connectWallet } = useWallet();
     const { address, isConnecting } = useConnection()
+
+    useEffect(() => {
+        refreshWc()
+    }, [])
 
     const handleConnectWallet = async () => {
         try {

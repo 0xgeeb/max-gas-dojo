@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Game,
     WalletButton,
@@ -15,7 +15,6 @@ function App() {
     const [gameEngine, setGameEngine] = useState(null);
     const [currentScene, setCurrentScene] = useState('welcome');
     const [lobbyState, setLobbyState] = useState(null);
-    const [playerId, setPlayerId] = useState(null);
     const [toastMessage, setToastMessage] = useState('');
 
     const handleSceneChange = (scene) => {
@@ -24,9 +23,6 @@ function App() {
 
     const handleLobbyStateChange = (state) => {
         setLobbyState(state);
-        if (gameEngine && !playerId) {
-            setPlayerId(gameEngine.getPlayerId());
-        }
     };
 
     const handleToastMessage = (message) => {
@@ -62,7 +58,6 @@ function App() {
                         <LobbyUI
                             gameEngine={gameEngine}
                             lobbyState={lobbyState}
-                            playerId={playerId}
                         />
                     )}
                     

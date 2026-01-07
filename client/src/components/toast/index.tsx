@@ -18,7 +18,7 @@ export const Toast = ({ message, duration = 3000, onClose }) => {
     if (!visible || !message) return null;
 
     return (
-        <div className="absolute top-[100px] left-1/2 -translate-x-1/2 bg-blue-500/95 text-white px-8 py-4 rounded z-[1001] animate-slideDown">
+        <div className="absolute top-[100px] left-1/2 -translate-x-1/2 bg-black border-2 border-white text-white px-8 py-4 rounded-lg z-[1001] animate-slideDown">
             <span>{message}</span>
         </div>
     );
