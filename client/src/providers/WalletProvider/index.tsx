@@ -8,7 +8,7 @@ import {
     useState
 } from "react"
 import { useConnection, useConnect, useConnectors } from "wagmi"
-import { formatEther } from "viem"
+import { formatEther, parseEther } from "viem"
 import { writeContract, readContract, waitForTransactionReceipt } from "@wagmi/core"
 import { mainnet } from "wagmi/chains"
 import { config } from "../../providers/WagmiProvider"
@@ -19,7 +19,10 @@ const INITIAL_STATE = {
     wcBalance: 0,
     connectWallet: async () => undefined,
     refreshWc: async () => {},
-    sendWcApproveTx: async () => undefined as string | undefined
+    sendWcApproveTx: async () => undefined as string | undefined,
+    sendCreateMatchTx: async (_opponent: string, _wager: number) => undefined as string | undefined,
+    sendAcceptMatchTx: async (_id: number) => undefined as string | undefined,
+    sendCancelMatchTx: async (_id: number) => undefined as string | undefined
 }
 
 const WalletContext = createContext(INITIAL_STATE)
@@ -79,13 +82,73 @@ export const WalletProvider = (props: PropsWithChildren<{}>) => {
         }
     }
 
+    const sendCreateMatchTx = async (opponent: string, wager: number): Promise<string> => {
+        try {
+            const hash = await writeContract(config, {
+                address: contracts.escrow.address as `0x${string}`,
+                abi: contracts.escrow.abi,
+                functionName: 'createMatch',
+                args: [opponent, parseEther(`${wager}`)],
+                chain: mainnet,
+                account: address
+            })
+            const data = await waitForTransactionReceipt(config, { hash })
+            return data.transactionHash
+        }
+        catch (e) {
+            console.log("user denied tx");
+            console.log("or: ", e);
+        }
+    }
+
+    const sendAcceptMatchTx = async (id: number): Promise<string> => {
+        try {
+            const hash = await writeContract(config, {
+                address: contracts.escrow.address as `0x${string}`,
+                abi: contracts.escrow.abi,
+                functionName: 'acceptMatch',
+                args: [id],
+                chain: mainnet,
+                account: address
+            })
+            const data = await waitForTransactionReceipt(config, { hash })
+            return data.transactionHash
+        }
+        catch (e) {
+            console.log("user denied tx");
+            console.log("or: ", e);
+        }
+    }
+
+    const sendCancelMatchTx = async (id: number): Promise<string> => {
+        try {
+            const hash = await writeContract(config, {
+                address: contracts.escrow.address as `0x${string}`,
+                abi: contracts.escrow.abi,
+                functionName: 'cancelMatch',
+                args: [id],
+                chain: mainnet,
+                account: address
+            })
+            const data = await waitForTransactionReceipt(config, { hash })
+            return data.transactionHash
+        }
+        catch (e) {
+            console.log("user denied tx");
+            console.log("or: ", e);
+        }
+    }
+
     return (
         <WalletContext.Provider value={{
             wcBalance: wcBalanceState,
             wcAllowance: wcAllowanceState,
             connectWallet,
             refreshWc,
-            sendWcApproveTx
+            sendWcApproveTx,
+            sendCreateMatchTx,
+            sendAcceptMatchTx,
+            sendCancelMatchTx
         }}>
             {children}
         </WalletContext.Provider>
