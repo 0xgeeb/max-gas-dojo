@@ -4,6 +4,7 @@ export class InputManager {
         this.keys = {};
         this.lastSentInput = {};
         this.attackPressed = false; // Track if attack was already pressed
+        this.lastDirectionPressed = null; // Track most recent direction key pressed
 
         this.setupEventListeners();
     }
@@ -19,6 +20,13 @@ export class InputManager {
                 return;
             }
 
+            // Track most recent direction key pressed
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') {
+                this.lastDirectionPressed = 'left';
+            } else if (e.code === 'KeyD' || e.code === 'ArrowRight') {
+                this.lastDirectionPressed = 'right';
+            }
+
             this.keys[e.code] = true;
             this.handleInput();
         });
@@ -27,6 +35,13 @@ export class InputManager {
             // Reset attack pressed state
             if (e.code === 'Space') {
                 this.attackPressed = false;
+            }
+
+            // Reset direction priority when direction key is released
+            if ((e.code === 'KeyA' || e.code === 'ArrowLeft') && this.lastDirectionPressed === 'left') {
+                this.lastDirectionPressed = null;
+            } else if ((e.code === 'KeyD' || e.code === 'ArrowRight') && this.lastDirectionPressed === 'right') {
+                this.lastDirectionPressed = null;
             }
 
             this.keys[e.code] = false;
@@ -58,6 +73,9 @@ export class InputManager {
 
         if (input.jump) {
             action = 'jump';
+        } else if (input.moveLeft && input.moveRight) {
+            // Both direction keys pressed - use most recently pressed
+            action = this.lastDirectionPressed === 'right' ? 'moveRight' : 'moveLeft';
         } else if (input.moveLeft) {
             action = 'moveLeft';
         } else if (input.moveRight) {
