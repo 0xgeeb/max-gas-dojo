@@ -617,6 +617,7 @@ io.on('connection', (socket) => {
       challenger: socket.id,
       challenged: data.challenged,
       wagerAmount: data.wagerAmount || 0,
+      matchId: data.matchId,
       status: 'pending',
       timestamp: now,
       expiresAt: now + 30000, // 30 seconds
@@ -634,7 +635,8 @@ io.on('connection', (socket) => {
       challengeId: challenge.id,
       challenger: socket.id,
       challengerWallet: challenger.walletAddress,
-      wagerAmount: challenge.wagerAmount
+      wagerAmount: challenge.wagerAmount,
+      matchId: challenge.matchId
     });
 
     // Confirm to challenger

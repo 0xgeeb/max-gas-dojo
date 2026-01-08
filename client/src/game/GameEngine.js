@@ -182,10 +182,11 @@ export class GameEngine {
         this.socket.emit('joinLobby', joinData);
     }
 
-    sendChallenge(playerId, wagerAmount) {
+    sendChallenge(playerId, wagerAmount, matchId) {
         this.socket.emit('sendChallenge', {
             challenged: playerId,
-            wagerAmount: wagerAmount
+            wagerAmount: wagerAmount,
+            matchId: matchId
         });
     }
 

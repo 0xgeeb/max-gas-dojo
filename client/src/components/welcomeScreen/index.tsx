@@ -9,8 +9,10 @@ export const WelcomeScreen = ({ gameEngine }) => {
     const { address, isConnecting } = useConnection()
 
     useEffect(() => {
-        refreshWc()
-    }, [])
+        if (address) {
+            refreshWc()
+        }
+    }, [address])
 
     const handleConnectWallet = async () => {
         try {
