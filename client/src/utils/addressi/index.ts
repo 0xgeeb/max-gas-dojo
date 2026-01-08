@@ -3,11 +3,11 @@ import wcABI from "../abi/WC.json"
 
 export const contracts = {
     escrow: {
-        address: "0xb7E448E5677D212B8C8Da7D6312E8Afc49800466",
+        address: "0xc6f4D3Ae8443f091A9c5015041093F3c0a41956f",
         abi: escrowABI.abi
     },
     wc: {
-        address: "0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c",
+        address: "0x8016269e0c30d897f495470aC464c283bf51A77b",
         abi: wcABI.abi
     }
 }

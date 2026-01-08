@@ -7,3 +7,4 @@
 /server/.env
 /client/.env
 /contracts/.env
+/contracts/broadcast
