@@ -1,0 +1,240 @@
+CODE REVIEW FINDINGS - Martial Hero Fighter
+===========================================
+
+🔴 CRITICAL ISSUES (Must Fix Immediately)
+==========================================
+
+1. Smart Contract Security Flaw - Unlimited Token Minting
+   Location: /contracts/src/WC.sol:17-23
+   Severity: CRITICAL
+   Description: WC token contract has no access control on mint and burn functions.
+   Anyone can mint unlimited tokens or burn anyone's tokens! This completely breaks
+   the token economy.
+
+   Current Code:
+   ```
+   function mint(address _to, uint256 _amount) external {
+       _mint(_to, _amount);  // No access control!
+   }
+   ```
+
+   Fix: Add access control (e.g., Ownable) or remove these functions entirely.
+
+2. WalletButton Race Condition
+   Location: /client/src/components/walletButton/index.tsx:10-24
+   Severity: CRITICAL
+   Description: The wallet connection is asynchronous, but the code checks
+   `if (address)` immediately after calling `connectWallet()`. The address won't
+   be set yet, so `joinLobby` will never execute.
+
+   Current Code:
+   ```
+   await connectWallet();
+   if (address) {  // address is still the OLD value here!
+       gameEngine.joinLobby(address);
+   }
+   ```
+
+   Fix: Use a useEffect to watch for address changes, or pass the returned address.
+
+3. Memory Leaks from Uncanceled Timeouts
+   Location: /server/server.js:303, 307, 645-666
+   Severity: CRITICAL
+   Description: Multiple setTimeout calls create timeouts that aren't tracked or
+   cleared if players disconnect early. This causes memory leaks.
+
+   Current Code:
+   ```
+   setTimeout(() => {
+       if (defender.state === 'takeHit') {
+           defender.state = 'idle';
+       }
+   }, 300);  // Never stored, can't be cancelled!
+   ```
+
+   Fix: Store timeout IDs and clear them on cleanup.
+
+4. CORS Wildcard in Production
+   Location: /server/server.js:13
+   Severity: CRITICAL
+   Description: Using `origin: "*"` allows any website to connect to your server,
+   enabling potential attacks.
+
+   Current Code:
+   ```
+   cors: {
+       origin: "*",  // DANGEROUS in production!
+   ```
+
+   Fix: Set specific allowed origins for production.
+
+
+🟡 HIGH PRIORITY ISSUES
+========================
+
+5. No Blockchain Validation for Match IDs
+   Location: /server/server.js:619, 671-698
+   Severity: HIGH
+   Description: The server accepts `matchId` from clients without verifying it
+   exists on the blockchain. Malicious clients could send fake IDs.
+
+   Fix: Call `resolver.getMatch(matchId)` to validate before accepting challenges.
+
+6. Challenge Expiration Race Condition
+   Location: /server/server.js:645-666
+   Severity: HIGH
+   Description: If a challenge is deleted (e.g., player disconnects) before the
+   expiration timeout fires, the timeout will try to access non-existent data and
+   cause errors.
+
+   Fix: Check if challenge exists before accessing it in the timeout callback.
+
+7. Missing Reconnection Logic
+   Location: /server/server.js:891-951
+   Severity: HIGH
+   Description: If a player disconnects during a fight, there's a 30-second timeout
+   but no way to reconnect to the ongoing match if they refresh or lose connection.
+
+   Fix: Implement reconnection logic using session tokens or wallet addresses.
+
+8. Player Sprite Memory Leak
+   Location: /client/src/game/GameEngine.js:305
+   Severity: HIGH
+   Description: Player sprites are created but never removed from the `playerSprites`
+   Map when players leave, causing memory accumulation.
+
+   Fix: Clean up sprites when players disconnect.
+
+9. Hardcoded Event Signature [FIXED]
+   Location: /client/src/providers/WalletProvider/index.tsx:102
+   Severity: HIGH
+   Description: The MatchCreated event signature is hardcoded. If you redeploy the
+   contract, this will silently break.
+
+   Current Code:
+   ```
+   log.topics[0] === '0x2c9089bdab8aeea6a8c5e41b785290b63781dd5c648c9c824bcc0883237cff32'
+   ```
+
+   Fix: Use viem's `parseEventLogs` or `decodeEventLog` with the ABI.
+
+10. Challenge Map Memory Leak
+    Location: /server/server.js:397, 645-666
+    Severity: HIGH
+    Description: Expired/declined challenges are never removed from the `challenges`
+    Map, causing memory growth over time.
+
+    Fix: Delete challenges after they expire or are resolved.
+
+
+🟠 MODERATE ISSUES
+==================
+
+11. Missing Wager Validation
+    Location: /server/server.js:562-669
+    Severity: MODERATE
+    Description: No validation on wager amounts. Users could create matches with
+    0.000001 tokens or absurdly high amounts.
+
+    Fix: Add min/max wager constraints.
+
+12. useEffect Missing Dependencies
+    Location: /client/src/components/lobbyUI/index.tsx:26-39
+    Severity: MODERATE
+    Description: React hooks have missing dependencies, which could cause stale
+    closures and bugs.
+
+    Fix: Add all dependencies or use refs where appropriate.
+
+13. Lobby Loop Running at 60 FPS When Empty
+    Location: /server/server.js:547-550
+    Severity: MODERATE
+    Description: The lobby game loop runs continuously even with 0 players,
+    wasting CPU.
+
+    Fix: Stop the loop when lobby is empty.
+
+14. Unused Dependency [FIXED]
+    Location: /server/package.json:13
+    Severity: MODERATE
+    Description: The `ethers` package is installed but never used (only `viem`
+    is used).
+
+    Fix: Remove `ethers` from dependencies.
+
+15. No Rate Limiting
+    Severity: MODERATE
+    Description: Beyond the 5-second challenge cooldown, there's no rate limiting
+    on socket events like playerInput, which could be spammed.
+
+    Fix: Implement rate limiting on all socket events.
+
+
+🟢 MINOR IMPROVEMENTS
+=====================
+
+16. Magic Numbers Throughout Code
+    Locations: Multiple files
+    Severity: MINOR
+    Description: Values like 600, 700, 100, 200, 400, 800 are hardcoded everywhere.
+    These should be named constants.
+
+    Fix: Create a shared constants file.
+
+17. Excessive Console Logging
+    Severity: MINOR
+    Description: Production code has many console.log statements that should use a
+    proper logging library or be removed.
+
+    Fix: Implement structured logging (e.g., winston, pino).
+
+18. Missing Error Handling for Asset Loading
+    Location: /client/src/game/GameEngine.js:170-175
+    Severity: MINOR
+    Description: If sprite assets fail to load, the game will crash without
+    user-friendly error messages.
+
+    Fix: Add error handling in sprite loading.
+
+19. Inconsistent Error Handling
+    Severity: MINOR
+    Description: Some functions throw errors, others return null, some use callbacks.
+    This makes debugging harder.
+
+    Fix: Standardize error handling patterns.
+
+20. Missing JSDoc Documentation
+    Severity: MINOR
+    Description: Most functions lack documentation, making maintenance harder.
+
+    Fix: Add JSDoc comments to public functions.
+
+21. No Environment Variable Documentation
+    Severity: MINOR
+    Description: The .env file is referenced but requirements aren't documented.
+
+    Fix: Create a .env.example file with all required variables.
+
+22. TypeScript Type Safety
+    Locations: Various .tsx files
+    Severity: MINOR
+    Description: Some TypeScript files use loose typing or skip type definitions.
+
+    Fix: Enable strict mode and add proper types.
+
+
+📊 SUMMARY
+==========
+
+Critical Issues:    4
+High Priority:      6
+Moderate:          5
+Minor:             7
+-------------------------
+Total Issues:      22
+
+Most Urgent Fixes:
+1. Secure WC token contract (unlimited minting vulnerability)
+2. Fix WalletButton race condition
+3. Clean up memory leaks from timeouts
+4. Secure CORS configuration

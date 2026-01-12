@@ -8,7 +8,7 @@ import {
     useState
 } from "react"
 import { useConnection, useConnect, useConnectors } from "wagmi"
-import { formatEther, parseEther } from "viem"
+import { formatEther, parseEther, decodeEventLog } from "viem"
 import { writeContract, readContract, waitForTransactionReceipt } from "@wagmi/core"
 import { base } from "wagmi/chains"
 import { config } from "../../providers/WagmiProvider"
@@ -97,15 +97,28 @@ export const WalletProvider = (props: PropsWithChildren<{}>) => {
             })
             const receipt = await waitForTransactionReceipt(config, { hash })
 
-            // Parse the MatchCreated event to get the match ID
-            const matchCreatedEvent = receipt.logs.find(log =>
-                log.topics[0] === '0x2c9089bdab8aeea6a8c5e41b785290b63781dd5c648c9c824bcc0883237cff32' // MatchCreated event signature
-            );
-
+            // Parse the MatchCreated event using viem's decodeEventLog
             let matchId = 0;
-            if (matchCreatedEvent && matchCreatedEvent.data) {
-                // Decode the matchID from the event data (first 32 bytes)
-                matchId = parseInt(matchCreatedEvent.data.slice(0, 66), 16);
+
+            for (const log of receipt.logs) {
+                try {
+                    const decoded = decodeEventLog({
+                        abi: contracts.escrow.abi,
+                        data: log.data,
+                        topics: log.topics
+                    });
+
+                    // Check if this is the MatchCreated event
+                    if (decoded.eventName === 'MatchCreated') {
+                        // Type assertion for the event args
+                        const args = decoded.args as any;
+                        matchId = Number(args.matchID);
+                        break;
+                    }
+                } catch {
+                    // Skip logs that don't match our ABI
+                    continue;
+                }
             }
 
             return { txHash: receipt.transactionHash, matchId };
