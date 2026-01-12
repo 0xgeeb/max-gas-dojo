@@ -21,7 +21,7 @@ contract DeployScript is Script {
         uint256 deployerPrivateKey = vm.envUint("PK");
         vm.startBroadcast(deployerPrivateKey);
 
-        // _deployWC();
+        _deployWC();
         // _cancel();
         // _accept();
 
