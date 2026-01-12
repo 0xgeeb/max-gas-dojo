@@ -4,7 +4,7 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const serverWeb3Manager = require('./web3');
+const resolver = require('./resolver');
 
 const app = express();
 const server = http.createServer(app);
@@ -345,10 +345,10 @@ class GameState {
       // Use challengeData if available (new system), otherwise fallback to matchData (old system)
       if (this.challengeData) {
         console.log(`Player ${loser.id} died. Resolving challenge match on blockchain...`);
+
         resolveMatchOnChain(
-          this.challengeData.id,
-          this.challengeData.challengerWallet,
-          this.challengeData.challengedWallet
+          this.challengeData.matchId,
+          winner.walletAddress
         ).then(result => {
           console.log('Challenge match resolved successfully:', result);
           // Return both players to lobby after blockchain resolution
@@ -368,8 +368,7 @@ class GameState {
             console.log(`Player ${loser.id} died. Resolving match on blockchain...`);
             resolveMatchOnChain(
               this.matchId,
-              winnerData.walletAddress,
-              loserData.walletAddress
+              winner.walletAddress
             ).then(result => {
               console.log('Match resolved successfully:', result);
               setTimeout(() => returnPlayersToLobby(fightId), 3000);
@@ -399,10 +398,10 @@ const challenges = new Map(); // Pending challenges
 const matchData = new Map(); // Match data storage (wallet addresses, stakes, etc.)
 
 // Helper function to resolve match on blockchain
-async function resolveMatchOnChain(matchId, winnerAddress, loserAddress) {
+async function resolveMatchOnChain(matchId, winnerAddress) {
   try {
     console.log(`Resolving match ${matchId} on blockchain...`);
-    const result = await serverWeb3Manager.resolveMatch(matchId, winnerAddress, loserAddress);
+    const result = await resolver.resolveMatch(matchId, winnerAddress);
     console.log('Match resolved:', result);
     return result;
   } catch (error) {
@@ -952,13 +951,13 @@ io.on('connection', (socket) => {
   });
 });
 
-// Initialize Web3 on server startup
-serverWeb3Manager.initialize().then(initialized => {
+// Initialize blockchain resolver on server startup
+resolver.initialize().then(initialized => {
   if (initialized) {
-    console.log('Server Web3 Manager initialized successfully');
-    console.log('Oracle address:', serverWeb3Manager.getOracleAddress());
+    console.log('Match Resolver initialized successfully');
+    console.log('Resolver address:', resolver.getResolverAddress());
   } else {
-    console.log('Server Web3 Manager not initialized (running in mock mode)');
+    console.log('Match Resolver not initialized (running in mock mode)');
   }
 });
 
