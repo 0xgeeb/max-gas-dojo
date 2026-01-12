@@ -16,10 +16,12 @@ contract WizardsCentralEscrow {
         address winner;
     }
 
-    error NotServer();
+    error NotResolver();
     error NotOpponent();
     error NotPlayer();
     error InvalidMatchState();
+    error InvalidWinner();
+    error InvalidWager();
 
     event MatchCreated(uint256 matchID, address player, address opponent, uint256 wager);
     event MatchAccepted(uint256 matchID, address player, address opponent, uint256 wager);
@@ -27,18 +29,25 @@ contract WizardsCentralEscrow {
     event MatchCancelled(uint256 matchID, address player, address opponent, uint256 wager);
 
     address public wc;
-    address public server;
+    address public resolver;
     address public feeCollector;
 
     uint256 public matchID;
 
     mapping(uint256 => Match) public matches;
 
-    constructor(address _wc) {
+    constructor(
+        address _wc,
+        address _resolver,
+        address _feeCollector
+    ) {
         wc = _wc;
+        resolver = _resolver;
+        feeCollector = _feeCollector;
     }
 
     function createMatch(address opponent, uint256 wager) external {
+        if(wager == 0) revert InvalidWager();
         SafeTransferLib.safeTransferFrom(wc, msg.sender, address(this), wager);
         matchID++;
         Match memory newMatch = Match({
@@ -65,16 +74,21 @@ contract WizardsCentralEscrow {
     }
 
     function resolveMatch(uint256 id, address winner) external {
-        if(msg.sender != server) revert NotServer();
+        if(msg.sender != resolver) revert NotResolver();
         Match storage matchToResolve = matches[id];
         if(!matchToResolve.accepted || matchToResolve.resolved || matchToResolve.cancelled) revert InvalidMatchState();
-        if(winner != matchToResolve.player && winner != matchToResolve.opponent) revert NotOpponent();
+        if(winner != address(0) && winner != matchToResolve.player && winner != matchToResolve.opponent) revert InvalidWinner();
         matchToResolve.winner = winner;
         matchToResolve.resolved = true;
-        uint256 wagerWin = matchToResolve.wager * 2;
-        uint256 fee = wagerWin * 5 / 100;
-        SafeTransferLib.safeTransfer(wc, winner, wagerWin - fee);
-        SafeTransferLib.safeTransfer(wc, feeCollector, fee);
+        if(winner == address(0)) {
+            SafeTransferLib.safeTransfer(wc, matchToResolve.player, matchToResolve.wager);
+            SafeTransferLib.safeTransfer(wc, matchToResolve.opponent, matchToResolve.wager);
+        } else {
+            uint256 wagerWin = matchToResolve.wager * 2;
+            uint256 fee = wagerWin * 5 / 100;
+            SafeTransferLib.safeTransfer(wc, winner, wagerWin - fee);
+            SafeTransferLib.safeTransfer(wc, feeCollector, fee);
+        }
         emit MatchResolved(id, matchToResolve.player, matchToResolve.opponent, matchToResolve.wager, winner);
     }
 

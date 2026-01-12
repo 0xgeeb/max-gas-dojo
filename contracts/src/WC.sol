@@ -3,6 +3,7 @@ pragma solidity ^0.8.22;
 
 import { ERC20 } from "../lib/solady/src/tokens/ERC20.sol";
 
+// todo: remove unlimited mint and burn and add purchase mechanism
 contract WC is ERC20 {
 
   function name() public pure override returns (string memory) {

@@ -11,6 +11,8 @@ contract DeployScript is Script {
     WizardsCentralEscrow escrow;
 
     address deployer = 0x895614c89beC7D11454312f740854d08CbF57A78;
+    address resolver = 0x895614c89beC7D11454312f740854d08CbF57A78;
+    address feeCollector = 0x895614c89beC7D11454312f740854d08CbF57A78;
 
     address wcaddy = 0x8016269e0c30d897f495470aC464c283bf51A77b;
     address escrowaddy = 0xc6f4D3Ae8443f091A9c5015041093F3c0a41956f;
@@ -20,7 +22,7 @@ contract DeployScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // _deployWC();
-        _cancel();
+        // _cancel();
         // _accept();
 
         vm.stopBroadcast();
@@ -28,7 +30,7 @@ contract DeployScript is Script {
 
     function _deployWC() internal {
         wc = new WC();
-        escrow = new WizardsCentralEscrow(address(wc));
+        escrow = new WizardsCentralEscrow(address(wc), resolver, feeCollector);
         wc.mint(deployer, 100e18);
     }
 
