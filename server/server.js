@@ -8,15 +8,25 @@ const resolver = require('./resolver');
 
 const app = express();
 const server = http.createServer(app);
+
+// Configure CORS origins - use environment variable or default to localhost for development
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+  : ['http://localhost:3000'];
+
 const io = socketIo(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
 
 // Serve static files from built React app if it exists, otherwise serve old client
 const distPath = path.join(__dirname, '../client/dist');
@@ -104,6 +114,16 @@ class LobbyState {
     this.players.delete(socketId);
   }
 
+  // Get count of all players (including those in fights)
+  getTotalPlayerCount() {
+    return this.players.size;
+  }
+
+  // Get only players actively in lobby (not in fights)
+  getActiveLobbyPlayers() {
+    return Array.from(this.players.values()).filter(p => p.location === 'lobby');
+  }
+
   update() {
     const now = Date.now();
     const deltaTime = (now - this.lastUpdate) / 1000;
@@ -162,6 +182,7 @@ class GameState {
     this.lastUpdate = Date.now();
     this.matchResolved = false;
     this.disconnectTimeout = null;
+    this.timeouts = []; // Track all timeouts for cleanup
   }
 
   addPlayer(socketId, playerData) {
@@ -191,6 +212,16 @@ class GameState {
 
   removePlayer(socketId) {
     this.players.delete(socketId);
+  }
+
+  clearAllTimeouts() {
+    // Clear all tracked timeouts
+    this.timeouts.forEach(timeoutId => clearTimeout(timeoutId));
+    this.timeouts = [];
+    if (this.disconnectTimeout) {
+      clearTimeout(this.disconnectTimeout);
+      this.disconnectTimeout = null;
+    }
   }
 
   update() {
@@ -300,11 +331,12 @@ class GameState {
               // Visual feedback - set defender to take hit state
               if (defender.health > 0) {
                 defender.state = 'takeHit';
-                setTimeout(() => {
+                const timeoutId = setTimeout(() => {
                   if (defender.state === 'takeHit') {
                     defender.state = 'idle';
                   }
                 }, 300);
+                this.timeouts.push(timeoutId);
               } else {
                 defender.state = 'death';
                 // Trigger match resolution on blockchain
@@ -352,11 +384,13 @@ class GameState {
         ).then(result => {
           console.log('Challenge match resolved successfully:', result);
           // Return both players to lobby after blockchain resolution
-          setTimeout(() => returnPlayersToLobby(fightId), 3000); // 3 second delay
+          const timeoutId = setTimeout(() => returnPlayersToLobby(fightId), 3000); // 3 second delay
+          this.timeouts.push(timeoutId);
         }).catch(error => {
           console.error('Failed to resolve challenge match:', error);
           // Still return players to lobby even if blockchain fails
-          setTimeout(() => returnPlayersToLobby(fightId), 3000);
+          const timeoutId = setTimeout(() => returnPlayersToLobby(fightId), 3000);
+          this.timeouts.push(timeoutId);
         });
       } else if (this.matchId) {
         const match = matchData.get(this.matchId);
@@ -371,21 +405,25 @@ class GameState {
               winner.walletAddress
             ).then(result => {
               console.log('Match resolved successfully:', result);
-              setTimeout(() => returnPlayersToLobby(fightId), 3000);
+              const timeoutId = setTimeout(() => returnPlayersToLobby(fightId), 3000);
+              this.timeouts.push(timeoutId);
             }).catch(error => {
               console.error('Failed to resolve match:', error);
-              setTimeout(() => returnPlayersToLobby(fightId), 3000);
+              const timeoutId = setTimeout(() => returnPlayersToLobby(fightId), 3000);
+              this.timeouts.push(timeoutId);
             });
           } else {
             console.log('Match ended but no wallet addresses found');
-            setTimeout(() => returnPlayersToLobby(fightId), 3000);
+            const timeoutId = setTimeout(() => returnPlayersToLobby(fightId), 3000);
+            this.timeouts.push(timeoutId);
           }
         }
       }
     } else {
       // No blockchain match, just return to lobby immediately
       console.log('Non-blockchain fight ended. Returning players to lobby.');
-      setTimeout(() => returnPlayersToLobby(fightId), 3000); // Still add delay for game over screen
+      const timeoutId = setTimeout(() => returnPlayersToLobby(fightId), 3000); // Still add delay for game over screen
+      this.timeouts.push(timeoutId);
     }
   }
 }
@@ -396,6 +434,37 @@ const fights = new Map(); // Individual 1v1 fight instances (renamed from 'games
 const players = new Map(); // Track player locations (lobby or fight)
 const challenges = new Map(); // Pending challenges
 const matchData = new Map(); // Match data storage (wallet addresses, stakes, etc.)
+
+// Rate limiting tracking
+const rateLimits = new Map(); // Track rate limits per socket per event type
+
+// Helper function to check rate limit
+function checkRateLimit(socketId, eventType, maxRequests, windowMs) {
+  const key = `${socketId}:${eventType}`;
+  const now = Date.now();
+
+  if (!rateLimits.has(key)) {
+    rateLimits.set(key, { count: 1, resetTime: now + windowMs });
+    return true;
+  }
+
+  const limit = rateLimits.get(key);
+
+  // Reset if window expired
+  if (now > limit.resetTime) {
+    limit.count = 1;
+    limit.resetTime = now + windowMs;
+    return true;
+  }
+
+  // Check if limit exceeded
+  if (limit.count >= maxRequests) {
+    return false;
+  }
+
+  limit.count++;
+  return true;
+}
 
 // Helper function to resolve match on blockchain
 async function resolveMatchOnChain(matchId, winnerAddress) {
@@ -453,15 +522,26 @@ function returnPlayersToLobby(fightId) {
   if (fight.gameLoop) {
     clearInterval(fight.gameLoop);
   }
-  if (fight.disconnectTimeout) {
-    clearTimeout(fight.disconnectTimeout);
-  }
+  fight.clearAllTimeouts();
   fights.delete(fightId);
 
   // Update remaining lobby players
   io.to('lobby').emit('lobbyState', lobby.getState());
 
   console.log(`Players from fight ${fightId} returned to lobby`);
+}
+
+// Helper function to clean up a single challenge
+function cleanupChallenge(challengeId) {
+  const challenge = challenges.get(challengeId);
+  if (challenge) {
+    // Clear the expiration timeout
+    if (challenge.expirationTimeout) {
+      clearTimeout(challenge.expirationTimeout);
+      challenge.expirationTimeout = null;
+    }
+    challenges.delete(challengeId);
+  }
 }
 
 // Helper function to cancel all challenges involving a player
@@ -483,7 +563,7 @@ function cancelPlayerChallenges(socketId) {
         challengedPlayer.incomingChallenges = challengedPlayer.incomingChallenges.filter(id => id !== challengeId);
       }
     }
-    challenges.delete(challengeId);
+    cleanupChallenge(challengeId);
   });
 
   // Cancel all incoming challenges
@@ -504,7 +584,7 @@ function cancelPlayerChallenges(socketId) {
         challengerPlayer.outgoingChallenges = challengerPlayer.outgoingChallenges.filter(id => id !== challengeId);
       }
     }
-    challenges.delete(challengeId);
+    cleanupChallenge(challengeId);
   });
 
   // Clear player's challenge lists
@@ -517,8 +597,14 @@ io.on('connection', (socket) => {
   console.log('Player connected:', socket.id);
 
   socket.on('joinLobby', (data) => {
-    // Check if lobby is full (max 10 players)
-    if (lobby.players.size >= 10) {
+    // Rate limit: 3 requests per 10 seconds
+    if (!checkRateLimit(socket.id, 'joinLobby', 3, 10000)) {
+      socket.emit('challengeError', { message: 'Too many join requests. Please wait.' });
+      return;
+    }
+
+    // Check if lobby is full (max 10 players, including those in fights)
+    if (players.size >= 10) {
       socket.emit('lobbyFull', { message: 'Lobby is full. Please try again later.' });
       return;
     }
@@ -559,7 +645,7 @@ io.on('connection', (socket) => {
     console.log(`Player ${socket.id} joined lobby. Total players: ${lobby.players.size}/10`);
   });
 
-  socket.on('sendChallenge', (data) => {
+  socket.on('sendChallenge', async (data) => {
     console.log('sendChallenge received from', socket.id, 'data:', data);
 
     const challenger = lobby.players.get(socket.id);
@@ -573,6 +659,21 @@ io.on('connection', (socket) => {
       console.log('Sending challengeError: Player not found in lobby');
       socket.emit('challengeError', { message: 'Player not found in lobby' });
       return;
+    }
+
+    // Validate matchId exists on blockchain if resolver is initialized
+    if (data.matchId && resolver.isReady()) {
+      try {
+        const match = await resolver.getMatch(data.matchId);
+        if (!match) {
+          socket.emit('challengeError', { message: 'Match ID not found on blockchain' });
+          return;
+        }
+      } catch (error) {
+        console.error('Error validating matchId:', error);
+        socket.emit('challengeError', { message: 'Failed to validate match on blockchain' });
+        return;
+      }
     }
 
     if (socket.id === data.challenged) {
@@ -621,7 +722,8 @@ io.on('connection', (socket) => {
       timestamp: now,
       expiresAt: now + 30000, // 30 seconds
       challengerWallet: challenger.walletAddress,
-      challengedWallet: challenged.walletAddress
+      challengedWallet: challenged.walletAddress,
+      expirationTimeout: null // Track timeout for cleanup
     };
 
     challenges.set(challengeId, challenge);
@@ -642,7 +744,7 @@ io.on('connection', (socket) => {
     socket.emit('challengeSent', { challengeId });
 
     // Set expiration timer
-    setTimeout(() => {
+    challenge.expirationTimeout = setTimeout(() => {
       const ch = challenges.get(challengeId);
       if (ch && ch.status === 'pending') {
         ch.status = 'expired';
@@ -661,7 +763,7 @@ io.on('connection', (socket) => {
           challengedPlayer.incomingChallenges = challengedPlayer.incomingChallenges.filter(id => id !== challengeId);
         }
 
-        challenges.delete(challengeId);
+        cleanupChallenge(challengeId);
       }
     }, 30000);
 
@@ -669,6 +771,12 @@ io.on('connection', (socket) => {
   });
 
   socket.on('acceptChallenge', (data) => {
+    // Rate limit: 10 requests per 10 seconds
+    if (!checkRateLimit(socket.id, 'acceptChallenge', 10, 10000)) {
+      socket.emit('challengeError', { message: 'Too many requests. Please wait.' });
+      return;
+    }
+
     const challenge = challenges.get(data.challengeId);
 
     // Validation
@@ -739,6 +847,13 @@ io.on('connection', (socket) => {
     cancelPlayerChallenges(challenge.challenger);
     cancelPlayerChallenges(challenge.challenged);
 
+    // Stop lobby loop if empty to save CPU
+    if (lobby.players.size === 0 && lobby.isRunning) {
+      clearInterval(lobby.gameLoop);
+      lobby.isRunning = false;
+      console.log('Lobby empty - stopping game loop');
+    }
+
     // Store fight
     fights.set(fightId, fight);
 
@@ -771,6 +886,12 @@ io.on('connection', (socket) => {
   });
 
   socket.on('declineChallenge', (data) => {
+    // Rate limit: 10 requests per 10 seconds
+    if (!checkRateLimit(socket.id, 'declineChallenge', 10, 10000)) {
+      socket.emit('challengeError', { message: 'Too many requests. Please wait.' });
+      return;
+    }
+
     const challenge = challenges.get(data.challengeId);
 
     // Validation
@@ -808,12 +929,17 @@ io.on('connection', (socket) => {
       challenged.incomingChallenges = challenged.incomingChallenges.filter(id => id !== data.challengeId);
     }
 
-    challenges.delete(data.challengeId);
+    cleanupChallenge(data.challengeId);
 
     console.log(`Challenge ${data.challengeId} declined by ${socket.id}`);
   });
 
   socket.on('playerInput', (data) => {
+    // Rate limit: 100 requests per second
+    if (!checkRateLimit(socket.id, 'playerInput', 100, 1000)) {
+      return; // Silently drop excessive inputs
+    }
+
     const playerInfo = players.get(socket.id);
     if (!playerInfo) return;
 
@@ -904,6 +1030,13 @@ io.on('connection', (socket) => {
       // Notify other players in lobby
       io.to('lobby').emit('lobbyState', lobby.getState());
 
+      // Stop lobby loop if empty to save CPU
+      if (lobby.players.size === 0 && lobby.isRunning) {
+        clearInterval(lobby.gameLoop);
+        lobby.isRunning = false;
+        console.log('Lobby empty - stopping game loop');
+      }
+
       console.log(`Player ${socket.id} left lobby. Remaining players: ${lobby.players.size}/10`);
 
     } else if (playerInfo.location === 'fight') {
@@ -939,15 +1072,17 @@ io.on('connection', (socket) => {
             clearInterval(game.gameLoop);
             game.isRunning = false;
           }
-          if (game.disconnectTimeout) {
-            clearTimeout(game.disconnectTimeout);
-          }
+          game.clearAllTimeouts();
           fights.delete(game.id);
         }
       }
     }
 
     players.delete(socket.id);
+
+    // Clean up rate limit data for this socket
+    const rateLimitKeys = Array.from(rateLimits.keys()).filter(key => key.startsWith(`${socket.id}:`));
+    rateLimitKeys.forEach(key => rateLimits.delete(key));
   });
 });
 

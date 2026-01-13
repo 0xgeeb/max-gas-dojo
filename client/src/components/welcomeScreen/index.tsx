@@ -56,7 +56,7 @@ export const WelcomeScreen = ({ gameEngine }) => {
 
                 {/* Title */}
                 <h1 className="text-5xl font-semibold text-gray-900 mb-3 tracking-tight">
-                    Martial Hero Fighter
+                    Wizard's Central
                 </h1>
                 <p className="text-base text-gray-500 mb-12 max-w-sm mx-auto font-light">
                     Connect your wallet and challenge other players in epic 1v1 battles

@@ -21,8 +21,8 @@ contract DeployScript is Script {
         uint256 deployerPrivateKey = vm.envUint("PK");
         vm.startBroadcast(deployerPrivateKey);
 
-        _deployWC();
-        // _cancel();
+        // _deployWC();
+        _cancel();
         // _accept();
 
         vm.stopBroadcast();
@@ -35,7 +35,7 @@ contract DeployScript is Script {
     }
 
     function _cancel() internal {
-        WizardsCentralEscrow(escrowaddy).cancelMatch(3);
+        WizardsCentralEscrow(escrowaddy).cancelMatch(4);
     }
 
     function _accept() internal {

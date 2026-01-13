@@ -37,7 +37,7 @@ CODE REVIEW FINDINGS - Martial Hero Fighter
 
    Fix: Use a useEffect to watch for address changes, or pass the returned address.
 
-3. Memory Leaks from Uncanceled Timeouts
+3. Memory Leaks from Uncanceled Timeouts [FIXED]
    Location: /server/server.js:303, 307, 645-666
    Severity: CRITICAL
    Description: Multiple setTimeout calls create timeouts that aren't tracked or
@@ -54,7 +54,7 @@ CODE REVIEW FINDINGS - Martial Hero Fighter
 
    Fix: Store timeout IDs and clear them on cleanup.
 
-4. CORS Wildcard in Production
+4. CORS Wildcard in Production [FIXED]
    Location: /server/server.js:13
    Severity: CRITICAL
    Description: Using `origin: "*"` allows any website to connect to your server,
@@ -72,7 +72,7 @@ CODE REVIEW FINDINGS - Martial Hero Fighter
 🟡 HIGH PRIORITY ISSUES
 ========================
 
-5. No Blockchain Validation for Match IDs
+5. No Blockchain Validation for Match IDs [FIXED]
    Location: /server/server.js:619, 671-698
    Severity: HIGH
    Description: The server accepts `matchId` from clients without verifying it
@@ -80,7 +80,7 @@ CODE REVIEW FINDINGS - Martial Hero Fighter
 
    Fix: Call `resolver.getMatch(matchId)` to validate before accepting challenges.
 
-6. Challenge Expiration Race Condition
+6. Challenge Expiration Race Condition [FIXED]
    Location: /server/server.js:645-666
    Severity: HIGH
    Description: If a challenge is deleted (e.g., player disconnects) before the
@@ -97,7 +97,7 @@ CODE REVIEW FINDINGS - Martial Hero Fighter
 
    Fix: Implement reconnection logic using session tokens or wallet addresses.
 
-8. Player Sprite Memory Leak
+8. Player Sprite Memory Leak [FIXED]
    Location: /client/src/game/GameEngine.js:305
    Severity: HIGH
    Description: Player sprites are created but never removed from the `playerSprites`
@@ -118,7 +118,7 @@ CODE REVIEW FINDINGS - Martial Hero Fighter
 
    Fix: Use viem's `parseEventLogs` or `decodeEventLog` with the ABI.
 
-10. Challenge Map Memory Leak
+10. Challenge Map Memory Leak [FIXED]
     Location: /server/server.js:397, 645-666
     Severity: HIGH
     Description: Expired/declined challenges are never removed from the `challenges`
@@ -138,7 +138,7 @@ CODE REVIEW FINDINGS - Martial Hero Fighter
 
     Fix: Add min/max wager constraints.
 
-12. useEffect Missing Dependencies
+12. useEffect Missing Dependencies [FIXED]
     Location: /client/src/components/lobbyUI/index.tsx:26-39
     Severity: MODERATE
     Description: React hooks have missing dependencies, which could cause stale
@@ -146,7 +146,7 @@ CODE REVIEW FINDINGS - Martial Hero Fighter
 
     Fix: Add all dependencies or use refs where appropriate.
 
-13. Lobby Loop Running at 60 FPS When Empty
+13. Lobby Loop Running at 60 FPS When Empty [FIXED]
     Location: /server/server.js:547-550
     Severity: MODERATE
     Description: The lobby game loop runs continuously even with 0 players,
@@ -162,7 +162,7 @@ CODE REVIEW FINDINGS - Martial Hero Fighter
 
     Fix: Remove `ethers` from dependencies.
 
-15. No Rate Limiting
+15. No Rate Limiting [FIXED]
     Severity: MODERATE
     Description: Beyond the 5-second challenge cooldown, there's no rate limiting
     on socket events like playerInput, which could be spammed.
@@ -226,15 +226,29 @@ CODE REVIEW FINDINGS - Martial Hero Fighter
 📊 SUMMARY
 ==========
 
-Critical Issues:    4
-High Priority:      6
-Moderate:          5
+Critical Issues:    4 (2 fixed)
+High Priority:      6 (4 fixed)
+Moderate:          5 (4 fixed)
 Minor:             7
 -------------------------
-Total Issues:      22
+Total Issues:      22 (10 fixed)
 
-Most Urgent Fixes:
-1. Secure WC token contract (unlimited minting vulnerability)
-2. Fix WalletButton race condition
-3. Clean up memory leaks from timeouts
-4. Secure CORS configuration
+Fixed Issues:
+✅ #3  - Memory Leaks from Uncanceled Timeouts
+✅ #4  - CORS Wildcard in Production
+✅ #5  - No Blockchain Validation for Match IDs
+✅ #6  - Challenge Expiration Race Condition
+✅ #8  - Player Sprite Memory Leak
+✅ #9  - Hardcoded Event Signature
+✅ #10 - Challenge Map Memory Leak
+✅ #12 - useEffect Missing Dependencies
+✅ #13 - Lobby Loop Running at 60 FPS When Empty
+✅ #14 - Unused Dependency
+✅ #15 - No Rate Limiting
+
+Remaining Issues:
+⚠️  #1  - Smart Contract Security (not an issue per user)
+⚠️  #2  - WalletButton Race Condition (not an issue per user)
+⚠️  #7  - Missing Reconnection Logic
+⚠️  #11 - Missing Wager Validation (handled by blockchain)
+⚠️  #16-22 - Minor improvements

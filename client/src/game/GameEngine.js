@@ -67,6 +67,10 @@ export class GameEngine {
 
         this.socket.on('gameState', (state) => {
             this.gameState = state;
+            // Clean up sprites for players who left the fight
+            if (state.players) {
+                this.cleanupMissingPlayerSprites(state.players);
+            }
         });
 
         this.socket.on('disconnect', () => {
@@ -92,6 +96,8 @@ export class GameEngine {
         this.socket.on('lobbyState', (state) => {
             if (this.currentScene === 'lobby') {
                 this.lobbyState = state;
+                // Clean up sprites for players who left
+                this.cleanupMissingPlayerSprites(state.players);
                 if (this.onLobbyStateChange) {
                     this.onLobbyStateChange(state);
                 }
@@ -155,6 +161,9 @@ export class GameEngine {
             this.lobbyState = data.lobbyState;
             this.isGameRunning = false;
 
+            // Clean up all fight sprites when returning to lobby
+            this.playerSprites.clear();
+
             if (this.onSceneChange) {
                 this.onSceneChange('lobby');
             }
@@ -165,6 +174,19 @@ export class GameEngine {
                 this.onToastMessage('Returned to lobby');
             }
         });
+    }
+
+    // Clean up sprites for players no longer in the game
+    cleanupMissingPlayerSprites(currentPlayers) {
+        const currentPlayerIds = new Set(currentPlayers.map(p => p.id));
+
+        // Remove sprites for players who are no longer present
+        for (let [playerId, sprite] of this.playerSprites) {
+            if (!currentPlayerIds.has(playerId)) {
+                console.log(`Removing sprite for disconnected player: ${playerId}`);
+                this.playerSprites.delete(playerId);
+            }
+        }
     }
 
     loadAssets() {
