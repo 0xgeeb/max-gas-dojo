@@ -6,6 +6,8 @@ const path = require('path');
 const fs = require('fs');
 const resolver = require('./resolver');
 
+const MAX_LOBBY_PLAYERS = 2;
+
 const app = express();
 const server = http.createServer(app);
 
@@ -638,8 +640,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Check if lobby is full (max 10 players, including those in fights)
-    if (players.size >= 10) {
+    if (players.size >= MAX_LOBBY_PLAYERS) {
       socket.emit('lobbyFull', { message: 'Lobby is full. Please try again later.' });
       return;
     }
@@ -677,7 +678,7 @@ io.on('connection', (socket) => {
       lobbyState: lobby.getStateWithFighters(fights)
     });
 
-    console.log(`Player ${socket.id} joined lobby. Total players: ${lobby.players.size}/10`);
+    console.log(`Player ${socket.id} joined lobby. Total players: ${lobby.players.size}/${MAX_LOBBY_PLAYERS}`);
   });
 
   socket.on('sendChallenge', async (data) => {
@@ -1074,7 +1075,7 @@ io.on('connection', (socket) => {
         console.log('Lobby empty - stopping game loop');
       }
 
-      console.log(`Player ${socket.id} left lobby. Remaining players: ${lobby.players.size}/10`);
+      console.log(`Player ${socket.id} left lobby. Remaining players: ${lobby.players.size}/${MAX_LOBBY_PLAYERS}`);
 
     } else if (playerInfo.location === 'fight') {
       // Handle fight disconnect

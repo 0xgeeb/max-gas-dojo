@@ -5,6 +5,7 @@ export const Game = ({
     onSceneChange,
     onLobbyStateChange,
     onToastMessage,
+    onLobbyFull,
     setGameEngine
 }) => {
     const canvasRef = useRef(null);
@@ -17,6 +18,7 @@ export const Game = ({
         engine.onSceneChange = onSceneChange;
         engine.onLobbyStateChange = onLobbyStateChange;
         engine.onToastMessage = onToastMessage;
+        engine.onLobbyFull = onLobbyFull;
 
         gameEngineRef.current = engine;
 

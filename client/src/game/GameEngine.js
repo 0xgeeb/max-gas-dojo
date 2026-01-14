@@ -53,6 +53,7 @@ export class GameEngine {
         this.onLobbyStateChange = null;
         this.onChallengeReceived = null;
         this.onToastMessage = null;
+        this.onLobbyFull = null;
 
         this.isRunning = false;
         this.animationFrameId = null;
@@ -105,7 +106,9 @@ export class GameEngine {
         });
 
         this.socket.on('lobbyFull', (data) => {
-            alert(data.message);
+            if (this.onLobbyFull) {
+                this.onLobbyFull();
+            }
         });
 
         this.socket.on('challengeReceived', (challenge) => {
@@ -145,14 +148,22 @@ export class GameEngine {
 
         this.socket.on('fightStarting', (data) => {
             console.log('Fight starting:', data);
-            this.currentScene = 'fight';
             this.gameState = data.gameState;
             this.gameId = data.fightId;
-            this.isGameRunning = true;
 
-            if (this.onSceneChange) {
-                this.onSceneChange('fight');
+            if (this.onToastMessage) {
+                this.onToastMessage('Fight starting! Get ready!');
             }
+
+            // Delay the scene transition so the toast is visible
+            setTimeout(() => {
+                this.currentScene = 'fight';
+                this.isGameRunning = true;
+
+                if (this.onSceneChange) {
+                    this.onSceneChange('fight');
+                }
+            }, 2000);
         });
 
         this.socket.on('returnToLobby', (data) => {

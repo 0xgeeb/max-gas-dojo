@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useConnection } from "wagmi"
 import { useWallet } from '../../providers';
 
-export const WelcomeScreen = ({ gameEngine }) => {
+export const WelcomeScreen = ({ gameEngine, isLobbyFull }) => {
     const { refreshWc, connectWallet } = useWallet();
     const { address, isConnecting } = useConnection()
 
@@ -62,6 +62,24 @@ export const WelcomeScreen = ({ gameEngine }) => {
                     Connect your wallet and challenge other players in epic 1v1 battles
                 </p>
 
+                {/* Lobby Full Message */}
+                {isLobbyFull && (
+                    <div className="mb-8 bg-red-50 border border-red-200 rounded-lg px-6 py-4 max-w-sm mx-auto">
+                        <p className="text-red-800 text-sm font-medium mb-1">Sorry the lobby is full :( please try again later</p>
+                        <p className="text-red-600 text-sm">
+                            Tell me on twitter its full{' '}
+                            <a
+                                href="https://x.com/0xgeeb"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-semibold underline hover:text-red-800 transition-colors"
+                            >
+                                @0xgeeb
+                            </a>
+                        </p>
+                    </div>
+                )}
+
                 {/* Wallet Connection */}
                 <div className="space-y-4">
                     {!address ? (
@@ -82,10 +100,12 @@ export const WelcomeScreen = ({ gameEngine }) => {
                             </div>
                             <button
                                 onClick={handleEnterLobby}
+                                disabled={isLobbyFull}
                                 className="block w-full max-w-xs mx-auto px-10 py-3.5 bg-gray-900
                                          text-white text-base font-medium rounded-md
                                          hover:bg-gray-800 transition-colors duration-150
-                                         shadow-sm hover:shadow-md"
+                                         shadow-sm hover:shadow-md
+                                         disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Enter Lobby
                             </button>

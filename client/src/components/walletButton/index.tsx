@@ -19,7 +19,6 @@ export const WalletButton = ({ gameEngine }) => {
             }
         } catch (error) {
             console.error('Error connecting wallet:', error);
-            alert('Failed to connect wallet: ' + error.message);
         }
     };
 
