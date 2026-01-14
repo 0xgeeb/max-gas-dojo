@@ -112,7 +112,7 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
     return (
         <>
             {/* Players Sidebar */}
-            <div className="absolute top-0 left-0 w-[280px] h-screen overflow-y-auto p-6 z-[100]">
+            <div className="absolute top-0 left-0 w-full max-w-[400px] h-screen overflow-y-auto p-6 z-[100]">
                 <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 p-5">
                     <div className="flex justify-between items-center mb-5 pb-4 border-b border-gray-200">
                         <h3 className="m-0 text-gray-900 text-lg font-semibold">Players in Lobby</h3>
@@ -124,17 +124,21 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
                         {lobbyState?.players?.map(player => (
                             <div
                                 key={player.id}
-                                className={`bg-gray-50 hover:bg-gray-100 p-3 rounded-lg flex justify-between items-center transition-colors ${
+                                className={`bg-gray-50 hover:bg-gray-100 p-3 rounded-lg flex items-center gap-3 transition-colors ${
                                     player.id === playerId ? 'ring-2 ring-gray-900' : ''
                                 }`}
                             >
                                 <span
-                                    className="text-xs font-mono text-gray-700 overflow-hidden text-ellipsis whitespace-nowrap max-w-[130px]"
+                                    className="text-xs font-mono text-gray-700 flex-1"
                                     title={player.walletAddress}
                                 >
                                     {formatAddress(player.walletAddress)}
                                 </span>
-                                {player.id !== playerId ? (
+                                {player.id === playerId ? (
+                                    <span className="text-[10px] text-gray-500 font-medium">(You)</span>
+                                ) : player.status === 'fighting' ? (
+                                    <span className="text-[10px] text-gray-500 font-medium">(Fighting)</span>
+                                ) : (
                                     <button
                                         className="bg-gray-900 hover:bg-gray-800 text-white border-none px-3 py-1.5 rounded-md cursor-pointer text-xs font-medium transition-colors shadow-sm"
                                         onClick={() => {
@@ -144,8 +148,6 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
                                     >
                                         Challenge
                                     </button>
-                                ) : (
-                                    <span className="text-[10px] text-gray-500 font-medium">(You)</span>
                                 )}
                             </div>
                         ))}

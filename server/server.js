@@ -168,6 +168,30 @@ class LobbyState {
       players: Array.from(this.players.values())
     };
   }
+
+  // Get state including fighting players for full lobby view
+  getStateWithFighters(fights) {
+    const lobbyPlayers = Array.from(this.players.values()).map(p => ({
+      ...p,
+      status: 'lobby'
+    }));
+
+    const fightingPlayers = [];
+    for (const fight of fights.values()) {
+      for (const player of fight.players.values()) {
+        fightingPlayers.push({
+          id: player.id,
+          walletAddress: player.walletAddress,
+          sprite: player.sprite,
+          status: 'fighting'
+        });
+      }
+    }
+
+    return {
+      players: [...lobbyPlayers, ...fightingPlayers]
+    };
+  }
 }
 
 // Game logic
@@ -514,7 +538,7 @@ function returnPlayersToLobby(fightId) {
 
     // Notify client to return to lobby
     io.to(socketId).emit('returnToLobby', {
-      lobbyState: lobby.getState()
+      lobbyState: lobby.getStateWithFighters(fights)
     });
   });
 
@@ -531,13 +555,13 @@ function returnPlayersToLobby(fightId) {
     lobby.lastUpdate = Date.now();
     lobby.gameLoop = setInterval(() => {
       lobby.update();
-      io.to('lobby').emit('lobbyState', lobby.getState());
+      io.to('lobby').emit('lobbyState', lobby.getStateWithFighters(fights));
     }, 1000 / 60); // 60 FPS
     console.log('Lobby game loop restarted with returning players');
   }
 
   // Update remaining lobby players
-  io.to('lobby').emit('lobbyState', lobby.getState());
+  io.to('lobby').emit('lobbyState', lobby.getStateWithFighters(fights));
 
   console.log(`Players from fight ${fightId} returned to lobby`);
 }
@@ -643,14 +667,14 @@ io.on('connection', (socket) => {
       lobby.isRunning = true;
       lobby.gameLoop = setInterval(() => {
         lobby.update();
-        io.to('lobby').emit('lobbyState', lobby.getState());
+        io.to('lobby').emit('lobbyState', lobby.getStateWithFighters(fights));
       }, 1000 / 60); // 60 FPS
     }
 
     // Send confirmation to client
     socket.emit('lobbyJoined', {
       playerId: socket.id,
-      lobbyState: lobby.getState()
+      lobbyState: lobby.getStateWithFighters(fights)
     });
 
     console.log(`Player ${socket.id} joined lobby. Total players: ${lobby.players.size}/10`);
@@ -891,7 +915,7 @@ io.on('connection', (socket) => {
     });
 
     // Update lobby for remaining players
-    io.to('lobby').emit('lobbyState', lobby.getState());
+    io.to('lobby').emit('lobbyState', lobby.getStateWithFighters(fights));
 
     console.log(`Fight ${fightId} started: ${challenge.challenger} vs ${challenge.challenged}`);
   });
@@ -1041,7 +1065,7 @@ io.on('connection', (socket) => {
       cancelPlayerChallenges(socket.id);
 
       // Notify other players in lobby
-      io.to('lobby').emit('lobbyState', lobby.getState());
+      io.to('lobby').emit('lobbyState', lobby.getStateWithFighters(fights));
 
       // Stop lobby loop if empty to save CPU
       if (lobby.players.size === 0 && lobby.isRunning) {
