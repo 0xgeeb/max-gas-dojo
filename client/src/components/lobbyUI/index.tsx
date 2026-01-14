@@ -111,139 +111,149 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
 
     return (
         <>
-            <div className="absolute top-0 left-0 w-[250px] h-screen bg-transparent text-white overflow-y-auto p-5 z-[100]">
-                <div className="flex justify-between mb-5 pb-2.5 border-b-2 border-white text-lg font-bold">
-                    <h3 className="m-0">Players in Lobby</h3>
-                    <span>
-                        {lobbyState?.players?.length || 0}/10
-                    </span>
-                </div>
-                <div>
-                    {lobbyState?.players?.map(player => (
-                        <div
-                        key={player.id}
-                        className={`bg-white/10 p-2.5 mb-2.5 rounded-md flex justify-between items-center ${player.id === playerId ? 'border border-black' : ''}`}
-                            >
-                            <span
-                                className="text-xs overflow-hidden text-ellipsis whitespace-nowrap max-w-[120px]"
-                                title={player.walletAddress}
-                            >
-                                {formatAddress(player.walletAddress)}
-                            </span>
-                            {player.id !== playerId ? (
-                                <button
-                                    className="bg-black hover:bg-slate-700 hover:scale-110 text-white border-none px-4 py-1 rounded cursor-pointer text-xs"
-                                    onClick={() => {
-                                        setTargetPlayerId(player.id);
-                                        setCreateWagerModal(true);
-                                    }}
-                                >
-                                    Challenge
-                                </button>
-                            ) : (
-                                <span className="text-[10px] text-black">(You)</span>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            </div>
-            {incomingChallenges.length > 0 && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/95 p-8 rounded-lg z-[1000] min-w-[400px] border-2 border-white text-white">
-                    <h2 className="mt-0 text-white">Incoming Challenges</h2>
-                    {incomingChallenges.map(challenge => {
-                        const needsApproval = wcAllowance < challenge.wagerAmount;
-                        const insufficientBalance = wcBalance < challenge.wagerAmount;
-                        const canAccept = !isWrongChain && !insufficientBalance;
-
-                        return (
-                            <div key={challenge.challengeId} className="bg-white/10 p-4 mb-4 rounded-md">
-                                <p className="my-1">
-                                    <strong>
-                                        Challenge from{' '}{formatAddress(challenge.challengerWallet)}
-                                    </strong>
-                                </p>
-                                <p className="my-1">Wager: {challenge.wagerAmount} tokens</p>
-
-                                {isWrongChain && (
-                                    <p className="text-red-400 text-sm my-2">Wrong network - switch to Base</p>
-                                )}
-
-                                {!isWrongChain && insufficientBalance && (
-                                    <p className="text-red-400 text-sm my-2">Insufficient balance</p>
-                                )}
-
-                                {!isWrongChain && !insufficientBalance && needsApproval && (
-                                    <p className="text-yellow-400 text-sm my-2">Approval required</p>
-                                )}
-
-                                <div className="flex gap-2.5 mt-2.5">
-                                    <button
-                                        className="bg-green-600 hover:bg-green-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white border-none px-5 py-2 rounded cursor-pointer flex-1 transition-colors"
-                                        onClick={() => handleAcceptChallenge(challenge.challengeId)}
-                                        disabled={!canAccept}
-                                    >
-                                        {needsApproval && canAccept ? 'Approve & Accept' : 'Accept'}
-                                    </button>
-                                    <button
-                                        className="bg-red-600 hover:bg-red-700 text-white border-none px-5 py-2 rounded cursor-pointer flex-1 transition-colors"
-                                        onClick={() => handleDeclineChallenge(challenge.challengeId)}
-                                    >
-                                        Decline
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-            {
-                createWagerModal &&
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/95 p-8 rounded-lg z-[1000] min-w-[400px] border-2 border-white text-white flex flex-col items-center">
-                    <h2 className="mt-0 text-white">How many $WC would you like to wager?</h2>
-                    <div className="relative w-full mb-2">
-                        <input
-                            type="number"
-                            min="0"
-                            value={wager || ''}
-                            onChange={(e) => setWager(Number(e.target.value))}
-                            placeholder="Enter wager amount"
-                            className="w-full p-2 pr-24 rounded bg-white text-black outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">
-                            Balance: {wcBalance?.toFixed(2) || '0.00'}
+            {/* Players Sidebar */}
+            <div className="absolute top-0 left-0 w-[280px] h-screen overflow-y-auto p-6 z-[100]">
+                <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 p-5">
+                    <div className="flex justify-between items-center mb-5 pb-4 border-b border-gray-200">
+                        <h3 className="m-0 text-gray-900 text-lg font-semibold">Players in Lobby</h3>
+                        <span className="text-gray-600 text-sm font-medium">
+                            {lobbyState?.players?.length || 0}/10
                         </span>
                     </div>
-
-                    {isWrongChain && (
-                        <p className="text-red-400 text-sm mb-4 w-full">Wrong network - switch to Base</p>
-                    )}
-
-                    {wager > 0 && wcBalance < wager && (
-                        <p className="text-red-400 text-sm mb-4 w-full">Insufficient balance</p>
-                    )}
-
-                    {wager > 0 && wcAllowance < wager && wcBalance >= wager && (
-                        <p className="text-yellow-400 text-sm mb-4 w-full">Approval required</p>
-                    )}
-
-                    <div className="flex gap-2.5 w-full">
-                        <button
-                            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white border-none px-5 py-2 rounded cursor-pointer flex-1 transition-colors"
-                            onClick={sendWager}
-                            disabled={isWrongChain || !wager || isNaN(wager) || wager <= 0 || wcBalance < wager || isApproving || isCreatingMatch}
-                        >
-                            {isApproving ? 'Approving...' : isCreatingMatch ? 'Creating Match...' : (wager > 0 && wcAllowance < wager && wcBalance >= wager) ? 'Approve' : 'Send Challenge'}
-                        </button>
-                        <button
-                            className="bg-red-600 hover:bg-red-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white border-none px-5 py-2 rounded cursor-pointer flex-1 transition-colors"
-                            onClick={cancelWager}
-                            disabled={isApproving || isCreatingMatch}
-                        >
-                            Cancel
-                        </button>
+                    <div className="space-y-2">
+                        {lobbyState?.players?.map(player => (
+                            <div
+                                key={player.id}
+                                className={`bg-gray-50 hover:bg-gray-100 p-3 rounded-lg flex justify-between items-center transition-colors ${
+                                    player.id === playerId ? 'ring-2 ring-gray-900' : ''
+                                }`}
+                            >
+                                <span
+                                    className="text-xs font-mono text-gray-700 overflow-hidden text-ellipsis whitespace-nowrap max-w-[130px]"
+                                    title={player.walletAddress}
+                                >
+                                    {formatAddress(player.walletAddress)}
+                                </span>
+                                {player.id !== playerId ? (
+                                    <button
+                                        className="bg-gray-900 hover:bg-gray-800 text-white border-none px-3 py-1.5 rounded-md cursor-pointer text-xs font-medium transition-colors shadow-sm"
+                                        onClick={() => {
+                                            setTargetPlayerId(player.id);
+                                            setCreateWagerModal(true);
+                                        }}
+                                    >
+                                        Challenge
+                                    </button>
+                                ) : (
+                                    <span className="text-[10px] text-gray-500 font-medium">(You)</span>
+                                )}
+                            </div>
+                        ))}
                     </div>
                 </div>
-            }
+            </div>
+            {/* Incoming Challenges Modal */}
+            {incomingChallenges.length > 0 && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h2 className="mt-0 mb-6 text-gray-900 text-2xl font-semibold">Incoming Challenges</h2>
+                        {incomingChallenges.map(challenge => {
+                            const needsApproval = wcAllowance < challenge.wagerAmount;
+                            const insufficientBalance = wcBalance < challenge.wagerAmount;
+                            const canAccept = !isWrongChain && !insufficientBalance;
+
+                            return (
+                                <div key={challenge.challengeId} className="bg-gray-50 p-5 mb-4 rounded-lg border border-gray-200">
+                                    <p className="my-2 text-gray-900">
+                                        <strong className="font-semibold">
+                                            Challenge from{' '}{formatAddress(challenge.challengerWallet)}
+                                        </strong>
+                                    </p>
+                                    <p className="my-2 text-gray-700">Wager: <span className="font-semibold">{challenge.wagerAmount} tokens</span></p>
+
+                                    {isWrongChain && (
+                                        <p className="text-red-600 text-sm my-2 bg-red-50 px-3 py-2 rounded-md">Wrong network - switch to Base</p>
+                                    )}
+
+                                    {!isWrongChain && insufficientBalance && (
+                                        <p className="text-red-600 text-sm my-2 bg-red-50 px-3 py-2 rounded-md">Insufficient balance</p>
+                                    )}
+
+                                    {!isWrongChain && !insufficientBalance && needsApproval && (
+                                        <p className="text-yellow-700 text-sm my-2 bg-yellow-50 px-3 py-2 rounded-md">Approval required</p>
+                                    )}
+
+                                    <div className="flex gap-3 mt-4">
+                                        <button
+                                            className="btn-success flex-1"
+                                            onClick={() => handleAcceptChallenge(challenge.challengeId)}
+                                            disabled={!canAccept}
+                                        >
+                                            {needsApproval && canAccept ? 'Approve & Accept' : 'Accept'}
+                                        </button>
+                                        <button
+                                            className="btn-danger flex-1"
+                                            onClick={() => handleDeclineChallenge(challenge.challengeId)}
+                                        >
+                                            Decline
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+            {/* Create Wager Modal */}
+            {createWagerModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content flex flex-col items-center">
+                        <h2 className="mt-0 mb-6 text-gray-900 text-2xl font-semibold">How many $WC would you like to wager?</h2>
+                        <div className="relative w-full mb-4">
+                            <input
+                                type="number"
+                                min="0"
+                                value={wager || ''}
+                                onChange={(e) => setWager(Number(e.target.value))}
+                                placeholder="Enter wager amount"
+                                className="input-field pr-28 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-mono pointer-events-none">
+                                Balance: {wcBalance?.toFixed(2) || '0.00'}
+                            </span>
+                        </div>
+
+                        {isWrongChain && (
+                            <p className="text-red-600 text-sm mb-4 w-full bg-red-50 px-3 py-2 rounded-md">Wrong network - switch to Base</p>
+                        )}
+
+                        {wager > 0 && wcBalance < wager && (
+                            <p className="text-red-600 text-sm mb-4 w-full bg-red-50 px-3 py-2 rounded-md">Insufficient balance</p>
+                        )}
+
+                        {wager > 0 && wcAllowance < wager && wcBalance >= wager && (
+                            <p className="text-yellow-700 text-sm mb-4 w-full bg-yellow-50 px-3 py-2 rounded-md">Approval required</p>
+                        )}
+
+                        <div className="flex gap-3 w-full">
+                            <button
+                                className="btn-success flex-1"
+                                onClick={sendWager}
+                                disabled={isWrongChain || !wager || isNaN(wager) || wager <= 0 || wcBalance < wager || isApproving || isCreatingMatch}
+                            >
+                                {isApproving ? 'Approving...' : isCreatingMatch ? 'Creating Match...' : (wager > 0 && wcAllowance < wager && wcBalance >= wager) ? 'Approve' : 'Send Challenge'}
+                            </button>
+                            <button
+                                className="btn-danger flex-1"
+                                onClick={cancelWager}
+                                disabled={isApproving || isCreatingMatch}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

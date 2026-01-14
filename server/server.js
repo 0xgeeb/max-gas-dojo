@@ -525,6 +525,17 @@ function returnPlayersToLobby(fightId) {
   fight.clearAllTimeouts();
   fights.delete(fightId);
 
+  // Restart lobby loop if players are now in lobby and it's not running
+  if (lobby.players.size > 0 && !lobby.isRunning) {
+    lobby.isRunning = true;
+    lobby.lastUpdate = Date.now();
+    lobby.gameLoop = setInterval(() => {
+      lobby.update();
+      io.to('lobby').emit('lobbyState', lobby.getState());
+    }, 1000 / 60); // 60 FPS
+    console.log('Lobby game loop restarted with returning players');
+  }
+
   // Update remaining lobby players
   io.to('lobby').emit('lobbyState', lobby.getState());
 
@@ -941,7 +952,9 @@ io.on('connection', (socket) => {
     }
 
     const playerInfo = players.get(socket.id);
-    if (!playerInfo) return;
+    if (!playerInfo) {
+      return;
+    }
 
     // Handle input based on player location
     let game, player;

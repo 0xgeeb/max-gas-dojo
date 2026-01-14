@@ -26,9 +26,9 @@ export const WalletButton = ({ gameEngine }) => {
     return (
         <div
             onClick={handleConnect}
-            className={`absolute top-5 right-5 bg-black/70 hover:bg-black/85 px-4 py-2 rounded-full text-white text-sm font-mono z-[1000] transition-colors duration-200 ${address ? 'cursor-default' : 'cursor-pointer'}`}
+            className={`absolute top-6 right-6 bg-white/95 backdrop-blur-sm hover:bg-white border border-gray-200 px-5 py-2.5 rounded-full text-gray-900 text-sm font-mono z-[1000] transition-all duration-200 shadow-sm hover:shadow-md ${address ? 'cursor-default' : 'cursor-pointer hover:border-gray-300'}`}
         >
-            {isConnecting ? 'connecting...' : address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'connect'}
+            {isConnecting ? 'connecting...' : address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'connect wallet'}
         </div>
     );
 }

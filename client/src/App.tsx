@@ -36,7 +36,7 @@ function App() {
     return (
         <WagmiProvider>
             <WalletProvider>
-                <div className="relative w-screen h-screen overflow-hidden bg-sky-400">
+                <div className="relative w-screen h-screen overflow-hidden bg-[#faf9f7]">
                     {currentScene === 'welcome' && (
                         <WelcomeScreen gameEngine={gameEngine} />
                     )}
@@ -61,7 +61,6 @@ function App() {
                         />
                     )}
                     
-                    {/* todo: change to better looking messages */}
                     {toastMessage && (
                         <Toast
                             message={toastMessage}
