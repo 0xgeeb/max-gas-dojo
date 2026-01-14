@@ -11,6 +11,9 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
     const [targetPlayerId, setTargetPlayerId] = useState<string>(null)
     const [isApproving, setIsApproving] = useState<boolean>(false)
     const [isCreatingMatch, setIsCreatingMatch] = useState<boolean>(false)
+    const [isAcceptApproving, setIsAcceptApproving] = useState<boolean>(false)
+    const [isAcceptingMatch, setIsAcceptingMatch] = useState<boolean>(false)
+    const [acceptingChallengeId, setAcceptingChallengeId] = useState<string>(null)
 
     const {
         wcBalance,
@@ -76,14 +79,19 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
         const challenge = incomingChallenges.find(c => c.challengeId === challengeId);
         if (!challenge) return;
 
+        setAcceptingChallengeId(challengeId);
+
         try {
             // Check if approval is needed for the wager amount
             if (wcAllowance < challenge.wagerAmount) {
+                setIsAcceptApproving(true);
                 await sendWcApproveTx(challenge.wagerAmount);
+                setIsAcceptApproving(false);
             }
 
             // Accept the match on the blockchain
             if (challenge.matchId !== undefined) {
+                setIsAcceptingMatch(true);
                 const txHash = await sendAcceptMatchTx(challenge.matchId);
                 if (!txHash) {
                     // User rejected or transaction failed
@@ -96,6 +104,10 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
             setIncomingChallenges(prev => prev.filter(c => c.challengeId !== challengeId));
         } catch (error) {
             console.error('Error accepting challenge:', error);
+        } finally {
+            setIsAcceptApproving(false);
+            setIsAcceptingMatch(false);
+            setAcceptingChallengeId(null);
         }
     };
 
@@ -189,13 +201,16 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
                                         <button
                                             className="btn-success flex-1"
                                             onClick={() => handleAcceptChallenge(challenge.challengeId)}
-                                            disabled={!canAccept}
+                                            disabled={!canAccept || acceptingChallengeId === challenge.challengeId}
                                         >
-                                            {needsApproval && canAccept ? 'Approve & Accept' : 'Accept'}
+                                            {acceptingChallengeId === challenge.challengeId
+                                                ? (isAcceptApproving ? 'Approving...' : isAcceptingMatch ? 'Accepting...' : 'Accept')
+                                                : (needsApproval && canAccept ? 'Approve & Accept' : 'Accept')}
                                         </button>
                                         <button
                                             className="btn-danger flex-1"
                                             onClick={() => handleDeclineChallenge(challenge.challengeId)}
+                                            disabled={acceptingChallengeId === challenge.challengeId}
                                         >
                                             Decline
                                         </button>
