@@ -288,7 +288,7 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs text-gray-600 font-medium">
-                                            Wager: {' '}{challenge.wagerAmount} $WC
+                                            Wager: {' '}{challenge.wagerAmount} $MGD
                                         </span>
                                         <button
                                             className="bg-red-600 hover:bg-red-800 text-white border-none px-3 py-1.5 rounded-md cursor-pointer text-xs font-medium shadow-sm transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -321,7 +321,7 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
                                             Challenge from{' '}{formatAddress(challenge.challengerWallet)}
                                         </strong>
                                     </p>
-                                    <p className="my-2 text-gray-700">Wager: <span className="font-semibold">{challenge.wagerAmount} $WC</span></p>
+                                    <p className="my-2 text-gray-700">Wager: <span className="font-semibold">{challenge.wagerAmount} $MGD</span></p>
 
                                     {isWrongChain && (
                                         <p className="text-red-600 text-sm my-2 bg-red-50 px-3 py-2 rounded-md">Wrong network - switch to Base</p>
@@ -363,7 +363,7 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
             {createWagerModal && (
                 <div className="modal-overlay">
                     <div className="modal-content flex flex-col items-center">
-                        <h2 className="mt-0 mb-6 text-gray-900 text-2xl font-semibold">How many $WC would you like to wager?</h2>
+                        <h2 className="mt-0 mb-6 text-gray-900 text-2xl font-semibold">How many $MGD would you like to wager?</h2>
                         <div className="relative w-full mb-4">
                             <input
                                 type="number"

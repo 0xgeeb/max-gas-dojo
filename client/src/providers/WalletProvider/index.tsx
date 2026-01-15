@@ -46,15 +46,15 @@ export const WalletProvider = (props: PropsWithChildren<{}>) => {
     const refreshWc = async () => {
         console.log('refreshing balances')
         const wcAllowanceResult = await readContract(config, {
-            address: contracts.wc.address as `0x${string}`,
-            abi: contracts.wc.abi,
+            address: contracts.mgd.address as `0x${string}`,
+            abi: contracts.mgd.abi,
             functionName: 'allowance',
             args: [address, contracts.escrow.address],
             authorizationList: undefined
         })
         const wcBalanceResult = await readContract(config, {
-            address: contracts.wc.address as `0x${string}`,
-            abi: contracts.wc.abi,
+            address: contracts.mgd.address as `0x${string}`,
+            abi: contracts.mgd.abi,
             functionName: 'balanceOf',
             args: [address],
             authorizationList: undefined
@@ -67,8 +67,8 @@ export const WalletProvider = (props: PropsWithChildren<{}>) => {
     const sendWcApproveTx = async (wager: number): Promise<string> => {
         try {
             const hash = await writeContract(config, {
-                address: contracts.wc.address as `0x${string}`,
-                abi: contracts.wc.abi,
+                address: contracts.mgd.address as `0x${string}`,
+                abi: contracts.mgd.abi,
                 functionName: 'approve',
                 args: [contracts.escrow.address, parseEther(`${wager}`)],
                 chain: base,

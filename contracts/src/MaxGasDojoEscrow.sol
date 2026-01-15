@@ -3,7 +3,7 @@ pragma solidity ^0.8.22;
 
 import { SafeTransferLib } from "../lib/solady/src/utils/SafeTransferLib.sol";
 
-contract WizardsCentralEscrow {
+contract MaxGasDojoEscrow {
 
     struct Match {
         uint256 ID;
@@ -28,7 +28,7 @@ contract WizardsCentralEscrow {
     event MatchResolved(uint256 matchID, address player, address opponent, uint256 wager, address winner);
     event MatchCancelled(uint256 matchID, address player, address opponent, uint256 wager);
 
-    address public wc;
+    address public mgd;
     address public resolver;
     address public feeCollector;
 
@@ -37,18 +37,18 @@ contract WizardsCentralEscrow {
     mapping(uint256 => Match) public matches;
 
     constructor(
-        address _wc,
+        address _mgd,
         address _resolver,
         address _feeCollector
     ) {
-        wc = _wc;
+        mgd = _mgd;
         resolver = _resolver;
         feeCollector = _feeCollector;
     }
 
     function createMatch(address opponent, uint256 wager) external {
         if(wager == 0) revert InvalidWager();
-        SafeTransferLib.safeTransferFrom(wc, msg.sender, address(this), wager);
+        SafeTransferLib.safeTransferFrom(mgd, msg.sender, address(this), wager);
         matchID++;
         Match memory newMatch = Match({
             ID: matchID,
@@ -68,7 +68,7 @@ contract WizardsCentralEscrow {
         Match storage matchToAccept = matches[id];
         if(matchToAccept.accepted || matchToAccept.resolved || matchToAccept.cancelled) revert InvalidMatchState();
         if(msg.sender != matchToAccept.opponent) revert NotOpponent();
-        SafeTransferLib.safeTransferFrom(wc, msg.sender, address(this), matchToAccept.wager);
+        SafeTransferLib.safeTransferFrom(mgd, msg.sender, address(this), matchToAccept.wager);
         matchToAccept.accepted = true;
         emit MatchAccepted(id, matchToAccept.player, matchToAccept.opponent, matchToAccept.wager);
     }
@@ -81,13 +81,13 @@ contract WizardsCentralEscrow {
         matchToResolve.winner = winner;
         matchToResolve.resolved = true;
         if(winner == address(0)) {
-            SafeTransferLib.safeTransfer(wc, matchToResolve.player, matchToResolve.wager);
-            SafeTransferLib.safeTransfer(wc, matchToResolve.opponent, matchToResolve.wager);
+            SafeTransferLib.safeTransfer(mgd, matchToResolve.player, matchToResolve.wager);
+            SafeTransferLib.safeTransfer(mgd, matchToResolve.opponent, matchToResolve.wager);
         } else {
             uint256 wagerWin = matchToResolve.wager * 2;
             uint256 fee = wagerWin * 5 / 100;
-            SafeTransferLib.safeTransfer(wc, winner, wagerWin - fee);
-            SafeTransferLib.safeTransfer(wc, feeCollector, fee);
+            SafeTransferLib.safeTransfer(mgd, winner, wagerWin - fee);
+            SafeTransferLib.safeTransfer(mgd, feeCollector, fee);
         }
         emit MatchResolved(id, matchToResolve.player, matchToResolve.opponent, matchToResolve.wager, winner);
     }
@@ -97,7 +97,7 @@ contract WizardsCentralEscrow {
         if(matchToCancel.accepted || matchToCancel.resolved || matchToCancel.cancelled) revert InvalidMatchState();
         if(msg.sender != matchToCancel.player) revert NotPlayer();
         matchToCancel.cancelled = true;
-        SafeTransferLib.safeTransfer(wc, msg.sender, matchToCancel.wager);
+        SafeTransferLib.safeTransfer(mgd, msg.sender, matchToCancel.wager);
         emit MatchCancelled(id, matchToCancel.player, matchToCancel.opponent, matchToCancel.wager);
     }
 }

@@ -29,7 +29,7 @@ export const WalletButton = ({ gameEngine }) => {
         >
             {isConnecting ? 'connecting...' : address ? (
                 <>
-                    <span>{wcBalance?.toFixed(2) || '0.00'} $WC</span>
+                    <span>{wcBalance?.toFixed(2) || '0.00'} $MGD</span>
                     <span className="text-gray-400">|</span>
                     <span>{address.slice(0, 6)}...{address.slice(-4)}</span>
                 </>

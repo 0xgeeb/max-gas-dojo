@@ -2,24 +2,24 @@
 pragma solidity ^0.8.22;
 
 import { Test } from "../lib/forge-std/src/Test.sol";
-import { WC } from "../src/WC.sol";
+import { MGD } from "../src/MGD.sol";
 
-contract WCTest is Test {
-    WC public token;
+contract MGDTest is Test {
+    MGD public token;
 
     address public alice = makeAddr("alice");
     address public bob = makeAddr("bob");
 
     function setUp() public {
-        token = new WC();
+        token = new MGD();
     }
 
     function testName() public view {
-        assertEq(token.name(), "Wizards Central Token");
+        assertEq(token.name(), "Max Gas Dojo Token");
     }
 
     function testSymbol() public view {
-        assertEq(token.symbol(), "WC");
+        assertEq(token.symbol(), "MGD");
     }
 
     function testDecimals() public view {

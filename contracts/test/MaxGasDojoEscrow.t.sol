@@ -2,12 +2,12 @@
 pragma solidity ^0.8.22;
 
 import { Test } from "../lib/forge-std/src/Test.sol";
-import { WizardsCentralEscrow } from "../src/WizardsCentralEscrow.sol";
-import { WC } from "../src/WC.sol";
+import { MaxGasDojoEscrow } from "../src/MaxGasDojoEscrow.sol";
+import { MGD } from "../src/MGD.sol";
 
-contract WizardsCentralEscrowTest is Test {
-    WizardsCentralEscrow public escrow;
-    WC public token;
+contract MaxGasDojoEscrowTest is Test {
+    MaxGasDojoEscrow public escrow;
+    MGD public token;
 
     address public player = makeAddr("player");
     address public opponent = makeAddr("opponent");
@@ -19,8 +19,8 @@ contract WizardsCentralEscrowTest is Test {
     uint256 public constant MINT_AMOUNT = 10000e18;
 
     function setUp() public {
-        token = new WC();
-        escrow = new WizardsCentralEscrow(address(token), resolver, feeCollector);
+        token = new MGD();
+        escrow = new MaxGasDojoEscrow(address(token), resolver, feeCollector);
 
         token.mint(player, MINT_AMOUNT);
         token.mint(opponent, MINT_AMOUNT);
@@ -33,7 +33,7 @@ contract WizardsCentralEscrowTest is Test {
     }
 
     function testConstructor() public view {
-        assertEq(escrow.wc(), address(token));
+        assertEq(escrow.mgd(), address(token));
         assertEq(escrow.resolver(), resolver);
         assertEq(escrow.feeCollector(), feeCollector);
     }
@@ -67,7 +67,7 @@ contract WizardsCentralEscrowTest is Test {
 
     function testCreateMatchEmitsEvent() public {
         vm.expectEmit(true, true, true, true);
-        emit WizardsCentralEscrow.MatchCreated(1, player, opponent, WAGER);
+        emit MaxGasDojoEscrow.MatchCreated(1, player, opponent, WAGER);
 
         vm.prank(player);
         escrow.createMatch(opponent, WAGER);
@@ -103,7 +103,7 @@ contract WizardsCentralEscrowTest is Test {
         escrow.createMatch(opponent, WAGER);
 
         vm.expectEmit(true, true, true, true);
-        emit WizardsCentralEscrow.MatchAccepted(1, player, opponent, WAGER);
+        emit MaxGasDojoEscrow.MatchAccepted(1, player, opponent, WAGER);
 
         vm.prank(opponent);
         escrow.acceptMatch(1);
@@ -113,7 +113,7 @@ contract WizardsCentralEscrowTest is Test {
         vm.prank(player);
         escrow.createMatch(opponent, WAGER);
 
-        vm.expectRevert(WizardsCentralEscrow.NotOpponent.selector);
+        vm.expectRevert(MaxGasDojoEscrow.NotOpponent.selector);
         vm.prank(random);
         escrow.acceptMatch(1);
     }
@@ -125,7 +125,7 @@ contract WizardsCentralEscrowTest is Test {
         vm.prank(opponent);
         escrow.acceptMatch(1);
 
-        vm.expectRevert(WizardsCentralEscrow.InvalidMatchState.selector);
+        vm.expectRevert(MaxGasDojoEscrow.InvalidMatchState.selector);
         vm.prank(opponent);
         escrow.acceptMatch(1);
     }
@@ -140,7 +140,7 @@ contract WizardsCentralEscrowTest is Test {
         vm.prank(resolver);
         escrow.resolveMatch(1, player);
 
-        vm.expectRevert(WizardsCentralEscrow.InvalidMatchState.selector);
+        vm.expectRevert(MaxGasDojoEscrow.InvalidMatchState.selector);
         vm.prank(opponent);
         escrow.acceptMatch(1);
     }
@@ -152,7 +152,7 @@ contract WizardsCentralEscrowTest is Test {
         vm.prank(player);
         escrow.cancelMatch(1);
 
-        vm.expectRevert(WizardsCentralEscrow.InvalidMatchState.selector);
+        vm.expectRevert(MaxGasDojoEscrow.InvalidMatchState.selector);
         vm.prank(opponent);
         escrow.acceptMatch(1);
     }
@@ -210,7 +210,7 @@ contract WizardsCentralEscrowTest is Test {
         escrow.acceptMatch(1);
 
         vm.expectEmit(true, true, true, true);
-        emit WizardsCentralEscrow.MatchResolved(1, player, opponent, WAGER, player);
+        emit MaxGasDojoEscrow.MatchResolved(1, player, opponent, WAGER, player);
 
         vm.prank(resolver);
         escrow.resolveMatch(1, player);
@@ -223,7 +223,7 @@ contract WizardsCentralEscrowTest is Test {
         vm.prank(opponent);
         escrow.acceptMatch(1);
 
-        vm.expectRevert(WizardsCentralEscrow.NotResolver.selector);
+        vm.expectRevert(MaxGasDojoEscrow.NotResolver.selector);
         vm.prank(random);
         escrow.resolveMatch(1, player);
     }
@@ -232,7 +232,7 @@ contract WizardsCentralEscrowTest is Test {
         vm.prank(player);
         escrow.createMatch(opponent, WAGER);
 
-        vm.expectRevert(WizardsCentralEscrow.InvalidMatchState.selector);
+        vm.expectRevert(MaxGasDojoEscrow.InvalidMatchState.selector);
         vm.prank(resolver);
         escrow.resolveMatch(1, player);
     }
@@ -247,7 +247,7 @@ contract WizardsCentralEscrowTest is Test {
         vm.prank(resolver);
         escrow.resolveMatch(1, player);
 
-        vm.expectRevert(WizardsCentralEscrow.InvalidMatchState.selector);
+        vm.expectRevert(MaxGasDojoEscrow.InvalidMatchState.selector);
         vm.prank(resolver);
         escrow.resolveMatch(1, player);
     }
@@ -259,7 +259,7 @@ contract WizardsCentralEscrowTest is Test {
         vm.prank(player);
         escrow.cancelMatch(1);
 
-        vm.expectRevert(WizardsCentralEscrow.InvalidMatchState.selector);
+        vm.expectRevert(MaxGasDojoEscrow.InvalidMatchState.selector);
         vm.prank(resolver);
         escrow.resolveMatch(1, player);
     }
@@ -271,7 +271,7 @@ contract WizardsCentralEscrowTest is Test {
         vm.prank(opponent);
         escrow.acceptMatch(1);
 
-        vm.expectRevert(WizardsCentralEscrow.InvalidWinner.selector);
+        vm.expectRevert(MaxGasDojoEscrow.InvalidWinner.selector);
         vm.prank(resolver);
         escrow.resolveMatch(1, random);
     }
@@ -296,7 +296,7 @@ contract WizardsCentralEscrowTest is Test {
         escrow.createMatch(opponent, WAGER);
 
         vm.expectEmit(true, true, true, true);
-        emit WizardsCentralEscrow.MatchCancelled(1, player, opponent, WAGER);
+        emit MaxGasDojoEscrow.MatchCancelled(1, player, opponent, WAGER);
 
         vm.prank(player);
         escrow.cancelMatch(1);
@@ -306,7 +306,7 @@ contract WizardsCentralEscrowTest is Test {
         vm.prank(player);
         escrow.createMatch(opponent, WAGER);
 
-        vm.expectRevert(WizardsCentralEscrow.NotPlayer.selector);
+        vm.expectRevert(MaxGasDojoEscrow.NotPlayer.selector);
         vm.prank(opponent);
         escrow.cancelMatch(1);
     }
@@ -318,7 +318,7 @@ contract WizardsCentralEscrowTest is Test {
         vm.prank(opponent);
         escrow.acceptMatch(1);
 
-        vm.expectRevert(WizardsCentralEscrow.InvalidMatchState.selector);
+        vm.expectRevert(MaxGasDojoEscrow.InvalidMatchState.selector);
         vm.prank(player);
         escrow.cancelMatch(1);
     }
@@ -333,7 +333,7 @@ contract WizardsCentralEscrowTest is Test {
         vm.prank(resolver);
         escrow.resolveMatch(1, player);
 
-        vm.expectRevert(WizardsCentralEscrow.InvalidMatchState.selector);
+        vm.expectRevert(MaxGasDojoEscrow.InvalidMatchState.selector);
         vm.prank(player);
         escrow.cancelMatch(1);
     }
@@ -345,7 +345,7 @@ contract WizardsCentralEscrowTest is Test {
         vm.prank(player);
         escrow.cancelMatch(1);
 
-        vm.expectRevert(WizardsCentralEscrow.InvalidMatchState.selector);
+        vm.expectRevert(MaxGasDojoEscrow.InvalidMatchState.selector);
         vm.prank(player);
         escrow.cancelMatch(1);
     }
@@ -384,7 +384,7 @@ contract WizardsCentralEscrowTest is Test {
     }
 
     function testCreateMatchRevertZeroWager() public {
-        vm.expectRevert(WizardsCentralEscrow.InvalidWager.selector);
+        vm.expectRevert(MaxGasDojoEscrow.InvalidWager.selector);
         vm.prank(player);
         escrow.createMatch(opponent, 0);
     }
@@ -417,7 +417,7 @@ contract WizardsCentralEscrowTest is Test {
         escrow.acceptMatch(1);
 
         vm.expectEmit(true, true, true, true);
-        emit WizardsCentralEscrow.MatchResolved(1, player, opponent, WAGER, address(0));
+        emit MaxGasDojoEscrow.MatchResolved(1, player, opponent, WAGER, address(0));
 
         vm.prank(resolver);
         escrow.resolveMatch(1, address(0));
