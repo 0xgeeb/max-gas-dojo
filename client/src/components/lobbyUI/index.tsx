@@ -5,6 +5,7 @@ import { base } from 'wagmi/chains';
 
 export const LobbyUI = ({ gameEngine, lobbyState }) => {
     const [incomingChallenges, setIncomingChallenges] = useState([]);
+    const [pendingChallenges, setPendingChallenges] = useState([]);
     const [playerId, setPlayerId] = useState(null);
     const [createWagerModal, setCreateWagerModal] = useState<boolean>(false)
     const [wager, setWager] = useState<number>(null)
@@ -14,13 +15,16 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
     const [isAcceptApproving, setIsAcceptApproving] = useState<boolean>(false)
     const [isAcceptingMatch, setIsAcceptingMatch] = useState<boolean>(false)
     const [acceptingChallengeId, setAcceptingChallengeId] = useState<string>(null)
+    const [cancellingChallengeId, setCancellingChallengeId] = useState<string>(null)
+    const [pendingChallengeData, setPendingChallengeData] = useState(null)
 
     const {
         wcBalance,
         wcAllowance,
         sendWcApproveTx,
         sendCreateMatchTx,
-        sendAcceptMatchTx
+        sendAcceptMatchTx,
+        sendCancelMatchTx
     } = useWallet();
 
     const connection = useConnection();
@@ -29,17 +33,69 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
     useEffect(() => {
         if (!gameEngine) return;
 
-        const originalCallback = gameEngine.onChallengeReceived;
+        const originalChallengeReceived = gameEngine.onChallengeReceived;
         gameEngine.onChallengeReceived = (challenge) => {
             setIncomingChallenges(prev => [...prev, challenge]);
-            if (originalCallback) originalCallback(challenge);
+            if (originalChallengeReceived) originalChallengeReceived(challenge);
         };
+
+        const originalChallengeSent = gameEngine.onChallengeSent;
+        gameEngine.onChallengeSent = (data) => {
+            // Add the pending challenge with stored data
+            setPendingChallenges(prev => {
+                // Use pendingChallengeData if available
+                const challengeInfo = pendingChallengeData || {};
+                return [...prev, {
+                    challengeId: data.challengeId,
+                    ...challengeInfo
+                }];
+            });
+            setPendingChallengeData(null);
+            if (originalChallengeSent) originalChallengeSent(data);
+        };
+
+        const originalChallengeResponse = gameEngine.onChallengeResponse;
+        gameEngine.onChallengeResponse = (response) => {
+            // Only remove from pending challenges when accepted (fight starts)
+            // When declined, mark it so user knows to cancel on-chain and reclaim tokens
+            if (response.status === 'accepted') {
+                setPendingChallenges(prev => prev.filter(c => c.challengeId !== response.challengeId));
+            } else if (response.status === 'declined') {
+                setPendingChallenges(prev => prev.map(c =>
+                    c.challengeId === response.challengeId ? { ...c, status: 'declined' } : c
+                ));
+            }
+            if (originalChallengeResponse) originalChallengeResponse(response);
+        };
+
+        const originalChallengeExpired = gameEngine.onChallengeExpired;
+        gameEngine.onChallengeExpired = (data) => {
+            // Remove from incoming challenges (for the challenged player)
+            setIncomingChallenges(prev => prev.filter(c => c.challengeId !== data.challengeId));
+            // Mark as expired so challenger knows to cancel on-chain and reclaim tokens
+            setPendingChallenges(prev => prev.map(c =>
+                c.challengeId === data.challengeId ? { ...c, status: 'expired' } : c
+            ));
+            if (originalChallengeExpired) originalChallengeExpired(data);
+        };
+
+        const originalChallengeCancelled = gameEngine.onChallengeCancelled;
+        gameEngine.onChallengeCancelled = (data) => {
+            // Remove from incoming challenges when challenger cancels
+            setIncomingChallenges(prev => prev.filter(c => c.challengeId !== data.challengeId));
+            if (originalChallengeCancelled) originalChallengeCancelled(data);
+        };
+
         setPlayerId(gameEngine.getPlayerId())
 
         return () => {
-            gameEngine.onChallengeReceived = originalCallback;
+            gameEngine.onChallengeReceived = originalChallengeReceived;
+            gameEngine.onChallengeSent = originalChallengeSent;
+            gameEngine.onChallengeResponse = originalChallengeResponse;
+            gameEngine.onChallengeExpired = originalChallengeExpired;
+            gameEngine.onChallengeCancelled = originalChallengeCancelled;
         };
-    }, [gameEngine]);
+    }, [gameEngine, pendingChallengeData]);
 
     const sendWager = async () => {
         if (!wager || isNaN(wager) || wager <= 0) return;
@@ -56,6 +112,13 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
             const result = await sendCreateMatchTx(targetPlayer.walletAddress, wager);
 
             if (result && result.txHash) {
+                // Store challenge data before sending so we can display it in pending list
+                setPendingChallengeData({
+                    targetPlayerId,
+                    targetWallet: targetPlayer.walletAddress,
+                    wagerAmount: wager,
+                    matchId: result.matchId
+                });
                 gameEngine.sendChallenge(targetPlayerId, wager, result.matchId);
                 setCreateWagerModal(false);
                 setWager(null);
@@ -116,6 +179,29 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
         setIncomingChallenges(prev => prev.filter(c => c.challengeId !== challengeId));
     };
 
+    const handleCancelChallenge = async (challenge) => {
+        if (!challenge.matchId) return;
+
+        setCancellingChallengeId(challenge.challengeId);
+        try {
+            const txHash = await sendCancelMatchTx(challenge.matchId);
+            // Only remove from UI if transaction succeeded
+            if (!txHash) {
+                return;
+            }
+            // Only notify server if challenge is still pending (not already declined/expired)
+            // Server removes the challenge when opponent responds, so it won't be found
+            if (!challenge.status) {
+                gameEngine.cancelChallenge(challenge.challengeId);
+            }
+            setPendingChallenges(prev => prev.filter(c => c.challengeId !== challenge.challengeId));
+        } catch (error) {
+            console.error('Error cancelling challenge:', error);
+        } finally {
+            setCancellingChallengeId(null);
+        }
+    };
+
     const formatAddress = (address) => {
         if (!address) return '';
         return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -136,7 +222,7 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
                         {lobbyState?.players?.map(player => (
                             <div
                                 key={player.id}
-                                className={`bg-gray-50 hover:bg-gray-100 p-3 rounded-lg flex items-center gap-3 transition-colors ${
+                                className={`bg-gray-50 p-3 rounded-lg flex items-center gap-3 ${
                                     player.id === playerId ? 'ring-2 ring-gray-900' : ''
                                 }`}
                             >
@@ -152,7 +238,7 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
                                     <span className="text-[10px] text-gray-500 font-medium">(Fighting)</span>
                                 ) : (
                                     <button
-                                        className="bg-gray-900 hover:bg-gray-800 text-white border-none px-3 py-1.5 rounded-md cursor-pointer text-xs font-medium transition-colors shadow-sm"
+                                        className="bg-gray-900 hover:bg-gray-600 text-white border-none px-3 py-1.5 rounded-md cursor-pointer text-xs font-medium transition-colors shadow-sm"
                                         onClick={() => {
                                             setTargetPlayerId(player.id);
                                             setCreateWagerModal(true);
@@ -163,6 +249,58 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
                                 )}
                             </div>
                         ))}
+                    </div>
+                </div>
+
+                {/* Pending Challenges - Below Players List */}
+                <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 p-5 mt-4">
+                    <div className="flex justify-between items-center mb-5 pb-4 border-b border-gray-200">
+                        <h3 className="m-0 text-gray-900 text-lg font-semibold">Pending Challenges</h3>
+                        <span className="text-gray-600 text-sm font-medium">
+                            {pendingChallenges.length}
+                        </span>
+                    </div>
+                    <div className="space-y-2">
+                        {pendingChallenges.length === 0 ? (
+                            <p className="text-gray-400 text-sm text-center py-2">No pending challenges</p>
+                        ) : (
+                            pendingChallenges.map(challenge => (
+                                <div
+                                    key={challenge.challengeId}
+                                    className="bg-gray-50 p-3 rounded-lg flex flex-col gap-2"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span
+                                            className="text-xs font-mono text-gray-700"
+                                            title={challenge.targetWallet}
+                                        >
+                                            Opponent: {' '} {formatAddress(challenge.targetWallet)}
+                                        </span>
+                                        {challenge.status === 'declined' && (
+                                            <span className="text-xs text-red-600 font-medium">Status: Declined</span>
+                                        )}
+                                        {challenge.status === 'expired' && (
+                                            <span className="text-xs text-orange-600 font-medium">Status: Expired</span>
+                                        )}
+                                        {!challenge.status && (
+                                            <span className="text-xs text-yellow-600 font-medium">Status: Pending</span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-gray-600 font-medium">
+                                            Wager: {' '}{challenge.wagerAmount} $WC
+                                        </span>
+                                        <button
+                                            className="bg-red-600 hover:bg-red-800 text-white border-none px-3 py-1.5 rounded-md cursor-pointer text-xs font-medium shadow-sm transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            onClick={() => handleCancelChallenge(challenge)}
+                                            disabled={cancellingChallengeId === challenge.challengeId}
+                                        >
+                                            {cancellingChallengeId === challenge.challengeId ? 'Cancelling...' : 'Cancel'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
             </div>
@@ -183,7 +321,7 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
                                             Challenge from{' '}{formatAddress(challenge.challengerWallet)}
                                         </strong>
                                     </p>
-                                    <p className="my-2 text-gray-700">Wager: <span className="font-semibold">{challenge.wagerAmount} tokens</span></p>
+                                    <p className="my-2 text-gray-700">Wager: <span className="font-semibold">{challenge.wagerAmount} $WC</span></p>
 
                                     {isWrongChain && (
                                         <p className="text-red-600 text-sm my-2 bg-red-50 px-3 py-2 rounded-md">Wrong network - switch to Base</p>

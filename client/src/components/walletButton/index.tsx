@@ -4,7 +4,7 @@ import { useConnection } from "wagmi"
 import { useWallet } from '../../providers';
 
 export const WalletButton = ({ gameEngine }) => {
-    const { connectWallet  } = useWallet()
+    const { connectWallet, wcBalance } = useWallet()
     const { address, isConnecting } = useConnection()
 
     const handleConnect = async () => {
@@ -25,9 +25,15 @@ export const WalletButton = ({ gameEngine }) => {
     return (
         <div
             onClick={handleConnect}
-            className={`absolute top-6 right-6 bg-white/95 backdrop-blur-sm hover:bg-white border border-gray-200 px-5 py-2.5 rounded-full text-gray-900 text-sm font-mono z-[1000] transition-all duration-200 shadow-sm hover:shadow-md ${address ? 'cursor-default' : 'cursor-pointer hover:border-gray-300'}`}
+            className={`absolute top-6 right-6 bg-white/95 backdrop-blur-sm hover:bg-white border border-gray-200 px-5 py-2.5 rounded-full text-gray-900 text-sm font-mono z-[1000] transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-3 ${address ? 'cursor-default' : 'cursor-pointer hover:border-gray-300'}`}
         >
-            {isConnecting ? 'connecting...' : address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'connect wallet'}
+            {isConnecting ? 'connecting...' : address ? (
+                <>
+                    <span>{wcBalance?.toFixed(2) || '0.00'} $WC</span>
+                    <span className="text-gray-400">|</span>
+                    <span>{address.slice(0, 6)}...{address.slice(-4)}</span>
+                </>
+            ) : 'connect wallet'}
         </div>
     );
 }

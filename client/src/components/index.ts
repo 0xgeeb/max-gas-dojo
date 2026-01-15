@@ -1,4 +1,5 @@
 export * from "./game"
+export * from "./fightUI"
 export * from "./lobbyUI"
 export * from "./toast"
 export * from "./walletButton"

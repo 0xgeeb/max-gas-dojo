@@ -6,28 +6,26 @@ const path = require('path');
 const fs = require('fs');
 const resolver = require('./resolver');
 
-const MAX_LOBBY_PLAYERS = 2;
-
 const app = express();
 const server = http.createServer(app);
 
 // Configure CORS origins - use environment variable or default to localhost for development
 const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
-  : ['http://localhost:3000'];
+? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+: ['http://localhost:3000'];
 
 const io = socketIo(server, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST"],
-    credentials: true
-  }
+    cors: {
+        origin: allowedOrigins,
+        methods: ["GET", "POST"],
+        credentials: true
+    }
 });
 
 // Middleware
 app.use(cors({
-  origin: allowedOrigins,
-  credentials: true
+    origin: allowedOrigins,
+    credentials: true
 }));
 
 // Serve static files from built React app if it exists, otherwise serve old client
@@ -35,14 +33,16 @@ const distPath = path.join(__dirname, '../client/dist');
 const clientPath = path.join(__dirname, '../client');
 
 if (fs.existsSync(distPath)) {
-  console.log('Serving built React app from:', distPath);
-  app.use(express.static(distPath));
+    console.log('Serving built React app from:', distPath);
+    app.use(express.static(distPath));
 } else {
-  console.log('Built app not found. Serving from:', clientPath);
-  app.use(express.static(clientPath));
+    console.log('Built app not found. Serving from:', clientPath);
+    app.use(express.static(clientPath));
 }
 
 app.use('/assets', express.static(path.join(__dirname, '../client/assets')));
+
+const MAX_LOBBY_PLAYERS = 10;
 
 // ========================================
 // HITBOX CONFIGURATION
@@ -396,6 +396,15 @@ class GameState {
     if (this.matchResolved) return;
     this.matchResolved = true;
 
+    // Store fight result for returnToLobby notification
+    this.fightResult = {
+      winnerId: winner.id,
+      loserId: loser.id,
+      winnerWallet: winner.walletAddress,
+      loserWallet: loser.walletAddress,
+      wagerAmount: this.challengeData?.wagerAmount || 0
+    };
+
     const fightId = this.id;
 
     // If this is a blockchain match, resolve it
@@ -538,9 +547,22 @@ function returnPlayersToLobby(fightId) {
       socket.join('lobby');
     }
 
+    // Build fight result info for this player
+    let fightResultForPlayer = null;
+    if (fight.fightResult) {
+      const isWinner = socketId === fight.fightResult.winnerId;
+      const opponentWallet = isWinner ? fight.fightResult.loserWallet : fight.fightResult.winnerWallet;
+      fightResultForPlayer = {
+        won: isWinner,
+        wagerAmount: fight.fightResult.wagerAmount,
+        opponentWallet: opponentWallet
+      };
+    }
+
     // Notify client to return to lobby
     io.to(socketId).emit('returnToLobby', {
-      lobbyState: lobby.getStateWithFighters(fights)
+      lobbyState: lobby.getStateWithFighters(fights),
+      fightResult: fightResultForPlayer
     });
   });
 
@@ -968,6 +990,54 @@ io.on('connection', (socket) => {
     cleanupChallenge(data.challengeId);
 
     console.log(`Challenge ${data.challengeId} declined by ${socket.id}`);
+  });
+
+  socket.on('cancelChallenge', (data) => {
+    // Rate limit: 10 requests per 10 seconds
+    if (!checkRateLimit(socket.id, 'cancelChallenge', 10, 10000)) {
+      socket.emit('challengeError', { message: 'Too many requests. Please wait.' });
+      return;
+    }
+
+    const challenge = challenges.get(data.challengeId);
+
+    // Validation
+    if (!challenge) {
+      socket.emit('challengeError', { message: 'Challenge not found' });
+      return;
+    }
+
+    if (challenge.challenger !== socket.id) {
+      socket.emit('challengeError', { message: 'Not your challenge to cancel' });
+      return;
+    }
+
+    if (challenge.status !== 'pending') {
+      return; // Already handled
+    }
+
+    // Mark as cancelled
+    challenge.status = 'cancelled';
+
+    // Notify challenged user
+    io.to(challenge.challenged).emit('challengeCancelled', {
+      challengeId: data.challengeId
+    });
+
+    // Clean up challenge lists
+    const challenger = lobby.players.get(challenge.challenger);
+    const challenged = lobby.players.get(challenge.challenged);
+
+    if (challenger) {
+      challenger.outgoingChallenges = challenger.outgoingChallenges.filter(id => id !== data.challengeId);
+    }
+    if (challenged) {
+      challenged.incomingChallenges = challenged.incomingChallenges.filter(id => id !== data.challengeId);
+    }
+
+    cleanupChallenge(data.challengeId);
+
+    console.log(`Challenge ${data.challengeId} cancelled by ${socket.id}`);
   });
 
   socket.on('playerInput', (data) => {

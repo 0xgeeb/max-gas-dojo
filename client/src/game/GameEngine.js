@@ -51,6 +51,7 @@ export class GameEngine {
         // Callbacks for React components
         this.onSceneChange = null;
         this.onLobbyStateChange = null;
+        this.onGameStateUpdate = null;
         this.onChallengeReceived = null;
         this.onToastMessage = null;
         this.onLobbyFull = null;
@@ -71,6 +72,10 @@ export class GameEngine {
             // Clean up sprites for players who left the fight
             if (state.players) {
                 this.cleanupMissingPlayerSprites(state.players);
+            }
+            // Notify React of state update
+            if (this.onGameStateUpdate) {
+                this.onGameStateUpdate(state);
             }
         });
 
@@ -121,6 +126,9 @@ export class GameEngine {
         });
 
         this.socket.on('challengeResponse', (response) => {
+            if (this.onChallengeResponse) {
+                this.onChallengeResponse(response);
+            }
             if (this.onToastMessage) {
                 if (response.status === 'accepted') {
                     this.onToastMessage('Challenge accepted! Preparing fight...');
@@ -131,8 +139,20 @@ export class GameEngine {
         });
 
         this.socket.on('challengeExpired', (data) => {
+            if (this.onChallengeExpired) {
+                this.onChallengeExpired(data);
+            }
             if (this.onToastMessage) {
                 this.onToastMessage('Challenge expired');
+            }
+        });
+
+        this.socket.on('challengeCancelled', (data) => {
+            if (this.onChallengeCancelled) {
+                this.onChallengeCancelled(data);
+            }
+            if (this.onToastMessage) {
+                this.onToastMessage('Challenge was cancelled');
             }
         });
 
@@ -144,6 +164,9 @@ export class GameEngine {
 
         this.socket.on('challengeSent', (data) => {
             console.log('Challenge sent:', data);
+            if (this.onChallengeSent) {
+                this.onChallengeSent(data);
+            }
         });
 
         this.socket.on('fightStarting', (data) => {
@@ -152,18 +175,23 @@ export class GameEngine {
             this.gameId = data.fightId;
 
             if (this.onToastMessage) {
-                this.onToastMessage('Fight starting! Get ready!');
+                this.onToastMessage('Fight starting in 3 seconds!');
             }
 
             // Delay the scene transition so the toast is visible
             setTimeout(() => {
+                // Clear any toast messages before the fight starts
+                if (this.onToastMessage) {
+                    this.onToastMessage('');
+                }
+
                 this.currentScene = 'fight';
                 this.isGameRunning = true;
 
                 if (this.onSceneChange) {
                     this.onSceneChange('fight');
                 }
-            }, 2000);
+            }, 3000);
         });
 
         this.socket.on('returnToLobby', (data) => {
@@ -181,7 +209,25 @@ export class GameEngine {
             if (this.onLobbyStateChange) {
                 this.onLobbyStateChange(data.lobbyState);
             }
-            if (this.onToastMessage) {
+            if (this.onToastMessage && data.fightResult) {
+                const { won, wagerAmount, opponentWallet } = data.fightResult;
+                const shortenedWallet = opponentWallet
+                    ? `${opponentWallet.slice(0, 6)}...${opponentWallet.slice(-4)}`
+                    : 'Unknown';
+
+                if (wagerAmount > 0) {
+                    const tokenWord = wagerAmount === 1 ? 'token' : 'tokens';
+                    const message = won
+                        ? `You won ${wagerAmount} ${tokenWord} against ${shortenedWallet}!`
+                        : `You lost ${wagerAmount} ${tokenWord} to ${shortenedWallet}`;
+                    this.onToastMessage(message);
+                } else {
+                    const message = won
+                        ? `You won against ${shortenedWallet}!`
+                        : `You lost to ${shortenedWallet}`;
+                    this.onToastMessage(message);
+                }
+            } else if (this.onToastMessage) {
                 this.onToastMessage('Returned to lobby');
             }
         });
@@ -229,6 +275,10 @@ export class GameEngine {
 
     declineChallenge(challengeId) {
         this.socket.emit('declineChallenge', { challengeId });
+    }
+
+    cancelChallenge(challengeId) {
+        this.socket.emit('cancelChallenge', { challengeId });
     }
 
     // Game loop
@@ -283,6 +333,10 @@ export class GameEngine {
         const lobbybgSprite = this.spriteManager.sprites['lobbybg']
         this.ctx.drawImage(lobbybgSprite, 0, 0, this.canvas.width, this.canvas.height)
 
+        // Fade the background slightly so sprites are more visible
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
         // Draw all lobby players with movement
         if (this.lobbyState && this.lobbyState.players) {
             this.lobbyState.players.forEach(player => {
@@ -335,6 +389,13 @@ export class GameEngine {
         }
 
         // Get or create animated sprite
+        // Check if sprite type changed (e.g., player returned to lobby with different sprite)
+        const existingSprite = this.playerSprites.get(player.id);
+        if (existingSprite && existingSprite.playerId !== playerId) {
+            console.log(`SPRITE TYPE CHANGED FOR PLAYER ${player.id}: ${existingSprite.playerId} -> ${playerId}`);
+            this.playerSprites.delete(player.id);
+        }
+
         if (!this.playerSprites.has(player.id)) {
             console.log(`CREATING SPRITE FOR PLAYER: ${playerId} (ID: ${player.id})`);
             this.playerSprites.set(player.id, new AnimatedSprite(this.spriteManager, player.state, playerId));
@@ -351,13 +412,45 @@ export class GameEngine {
 
         animatedSprite.draw(this.ctx, x, y, width, height, player.facing);
 
-        // Draw health bar
-        const isMyPlayer = player.id === this.playerId;
-        const healthBarOffset = isMyPlayer ? -30 : -50;
-        this.drawHealthBar(player, x, y + healthBarOffset);
+        // Draw wallet address above sprite in lobby
+        if (this.currentScene === 'lobby' && player.walletAddress) {
+            this.drawWalletLabel(player, x, y);
+        }
+
+        // Draw health bar (only in fight scene)
+        // if (this.currentScene === 'fight') {
+        //     const isMyPlayer = player.id === this.playerId;
+        //     const healthBarOffset = isMyPlayer ? -30 : -50;
+        //     this.drawHealthBar(player, x, y + healthBarOffset);
+        // }
 
         // Draw debug hitboxes
-        this.drawHitboxes(player, isMyPlayer);
+        // this.drawHitboxes(player, isMyPlayer);
+    }
+
+    drawWalletLabel(player, x, y) {
+        const playerWidth = 160;
+        const centerX = x + playerWidth / 2;
+        const labelY = y + 25;
+
+        // Format address
+        const address = player.walletAddress;
+        const formatted = `${address.slice(0, 6)}...${address.slice(-4)}`;
+
+        // Draw background pill for readability
+        this.ctx.font = '9px monospace';
+        this.ctx.textAlign = 'center';
+        const textWidth = this.ctx.measureText(formatted).width;
+        const padding = 4;
+
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.beginPath();
+        this.ctx.roundRect(centerX - textWidth / 2 - padding, labelY - 10, textWidth + padding * 2, 13, 4);
+        this.ctx.fill();
+
+        // Draw text
+        this.ctx.fillStyle = '#fff';
+        this.ctx.fillText(formatted, centerX, labelY);
     }
 
     drawHealthBar(player, x, y) {

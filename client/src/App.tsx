@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
     Game,
     WalletButton,
     LobbyUI,
+    FightUI,
     Toast,
     WelcomeScreen
 } from "./components"
@@ -30,9 +31,9 @@ function App() {
         setToastMessage(message);
     };
 
-    const handleToastClose = () => {
+    const handleToastClose = useCallback(() => {
         setToastMessage('');
-    };
+    }, []);
 
     const handleLobbyFull = () => {
         setIsLobbyFull(true);
@@ -66,7 +67,11 @@ function App() {
                             lobbyState={lobbyState}
                         />
                     )}
-                    
+
+                    {currentScene === 'fight' && (
+                        <FightUI gameEngine={gameEngine} />
+                    )}
+
                     {toastMessage && (
                         <Toast
                             message={toastMessage}

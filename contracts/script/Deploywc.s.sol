@@ -25,8 +25,9 @@ contract DeployScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // _deployWC();
-        _cancel();
+        // _cancel();
         // _accept();
+        _mint();
 
         vm.stopBroadcast();
     }
@@ -43,6 +44,10 @@ contract DeployScript is Script {
 
     function _accept() internal {
         WizardsCentralEscrow(escrowaddy).acceptMatch(3);
+    }
+
+    function _mint() internal {
+        WC(wcaddy).mint(deployer, 1_000_000e18);
     }
 
 }
