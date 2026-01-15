@@ -55,6 +55,8 @@ export class GameEngine {
         this.onChallengeReceived = null;
         this.onToastMessage = null;
         this.onLobbyFull = null;
+        this.onGameOver = null;
+        this.gameOverFired = false;
 
         this.isRunning = false;
         this.animationFrameId = null;
@@ -173,6 +175,7 @@ export class GameEngine {
             console.log('Fight starting:', data);
             this.gameState = data.gameState;
             this.gameId = data.fightId;
+            this.gameOverFired = false;
 
             if (this.onToastMessage) {
                 this.onToastMessage('Fight starting in 3 seconds!');
@@ -345,9 +348,16 @@ export class GameEngine {
         }
     }
 
-    drawFightingScene() {        
+    drawFightingScene() {
         const arenabgSprite = this.spriteManager.sprites['arenabg']
-        this.ctx.drawImage(arenabgSprite, 0, 0, this.canvas.width, this.canvas.height)
+
+        // Draw background shifted up to align floor with sprite ground level
+        const yOffset = -50;
+        this.ctx.drawImage(arenabgSprite, 0, yOffset, this.canvas.width, this.canvas.height)
+
+        // Fade the background slightly so sprites are more visible
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         // Draw players
         if (this.gameState) {
@@ -355,28 +365,16 @@ export class GameEngine {
                 this.drawPlayer(player);
             });
 
-            // Check for game over
-            const deadPlayers = this.gameState.players.filter(p => p.health <= 0);
-            if (deadPlayers.length > 0) {
-                this.drawGameOver(deadPlayers[0]);
+            // Check for game over and fire callback once
+            const deadPlayer = this.gameState.players.find(p => p.health <= 0);
+            if (deadPlayer && !this.gameOverFired) {
+                this.gameOverFired = true;
+                const playerWon = deadPlayer.id !== this.playerId;
+                if (this.onGameOver) {
+                    this.onGameOver({ won: playerWon });
+                }
             }
         }
-    }
-
-    drawGameOver(deadPlayer) {
-        // Semi-transparent overlay
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-        // Determine if player won or lost
-        const playerWon = deadPlayer.id !== this.playerId;
-        const message = playerWon ? 'YOU WIN!' : 'YOU LOSE!';
-
-        // Draw message
-        this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.font = '48px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText(message, this.canvas.width / 2, this.canvas.height / 2);
     }
 
     drawPlayer(player) {

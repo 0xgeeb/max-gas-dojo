@@ -115,3 +115,33 @@ body {
         @apply bg-white rounded-xl shadow-xl border border-gray-200 p-8 min-w-[400px] max-w-2xl;
     }
 }
+
+/* Game result animations */
+@keyframes resultPulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.9;
+    }
+}
+
+@keyframes resultSlideIn {
+    0% {
+        transform: scale(0.5) translateY(-20px);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.1) translateY(0);
+    }
+    100% {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
+}
+
+.animate-result {
+    animation: resultSlideIn 0.5s ease-out forwards, resultPulse 2s ease-in-out 0.5s infinite;
+}
