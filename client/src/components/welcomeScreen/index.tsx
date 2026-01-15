@@ -59,7 +59,7 @@ export const WelcomeScreen = ({ gameEngine, isLobbyFull }) => {
                     Wizard's Central
                 </h1>
                 <p className="text-base text-gray-500 mb-12 max-w-sm mx-auto font-light">
-                    Connect your wallet and challenge other players in epic 1v1 battles
+                    2d PVP fights with token wagers
                 </p>
 
                 {/* Lobby Full Message */}
@@ -111,11 +111,6 @@ export const WelcomeScreen = ({ gameEngine, isLobbyFull }) => {
                             </button>
                         </div>
                     )}
-                </div>
-
-                {/* Footer info */}
-                <div className="mt-16 text-gray-400 text-sm font-light">
-                    <p>Challenge other players • Stake tokens • Prove your skills</p>
                 </div>
             </div>
         </div>
