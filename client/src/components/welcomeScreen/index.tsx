@@ -39,40 +39,36 @@ export const WelcomeScreen = ({ gameEngine, isLobbyFull }) => {
                 backgroundSize: '60px 60px'
             }}></div>
 
-            {/* Decorative elements */}
-            <div className="absolute top-20 right-20 w-32 h-32 border border-gray-200 rounded-full opacity-40"></div>
-            <div className="absolute bottom-32 left-16 w-24 h-24 border border-gray-200 rounded-full opacity-30"></div>
-
             {/* Content */}
             <div className="relative z-10 text-center px-4">
                 {/* Logo */}
-                <div className="mb-10">
+                <div className="mb-8">
                     <img
-                        src="/assets/wclogo.png"
-                        alt="Warrior Coin"
-                        className="w-48 h-48 mx-auto object-contain filter drop-shadow-sm"
+                        src="/assets/mgdlogo.png"
+                        alt="Max Gas Dojo"
+                        className="w-52 h-52 mx-auto object-contain hover:scale-[1.02] transition-transform duration-300"
                     />
                 </div>
 
                 {/* Title */}
-                <h1 className="text-5xl font-semibold text-gray-900 mb-3 tracking-tight">
-                    Wizard's Central
+                <h1 className="text-5xl md:text-6xl font-semibold text-gray-900 mb-2 tracking-tight">
+                    Max Gas Dojo
                 </h1>
-                <p className="text-base text-gray-500 mb-12 max-w-sm mx-auto font-light">
-                    2d PVP fights with token wagers
+                <p className="text-base text-gray-400 mb-12 max-w-sm mx-auto tracking-wide">
+                    2D PVP fights with token wagers
                 </p>
 
                 {/* Lobby Full Message */}
                 {isLobbyFull && (
-                    <div className="mb-8 bg-red-50 border border-red-200 rounded-lg px-6 py-4 max-w-sm mx-auto">
-                        <p className="text-red-800 text-sm font-medium mb-1">Sorry the lobby is full :( please try again later</p>
-                        <p className="text-red-600 text-sm">
+                    <div className="mb-8 bg-white border border-red-200 rounded-lg px-6 py-4 max-w-sm mx-auto shadow-sm">
+                        <p className="text-red-700 text-sm font-medium mb-1">Sorry the lobby is full :( please try again later</p>
+                        <p className="text-red-500 text-sm">
                             Tell me on twitter its full{' '}
                             <a
                                 href="https://x.com/0xgeeb"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="font-semibold underline hover:text-red-800 transition-colors"
+                                className="font-semibold underline hover:text-red-700 transition-colors"
                             >
                                 @0xgeeb
                             </a>
@@ -86,26 +82,28 @@ export const WelcomeScreen = ({ gameEngine, isLobbyFull }) => {
                         <button
                             onClick={handleConnectWallet}
                             disabled={isConnecting}
-                            className="px-10 py-3.5 bg-gray-900 text-white text-base font-medium rounded-md
-                                     hover:bg-gray-800 transition-colors duration-150
+                            className="px-12 py-4 bg-gray-900 text-white text-base font-medium rounded-lg
+                                     hover:bg-gray-800 transition-all duration-200
                                      disabled:opacity-50 disabled:cursor-not-allowed
-                                     shadow-sm hover:shadow-md"
+                                     shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-[0.99]"
                         >
                             {isConnecting ? 'Connecting...' : 'Connect Wallet'}
                         </button>
                     ) : (
-                        <div className="space-y-4">
-                            <div className="text-gray-600 text-sm font-mono bg-white border border-gray-200 rounded-md px-4 py-2 inline-block shadow-sm">
+                        <div className="space-y-5">
+                            <div className="inline-flex items-center gap-2.5 text-gray-600 text-sm font-mono
+                                          bg-white border border-gray-200 rounded-lg px-5 py-2.5 shadow-sm">
+                                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
                                 {`${address.slice(0, 6)}...${address.slice(-4)}`}
                             </div>
                             <button
                                 onClick={handleEnterLobby}
                                 disabled={isLobbyFull}
-                                className="block w-full max-w-xs mx-auto px-10 py-3.5 bg-gray-900
-                                         text-white text-base font-medium rounded-md
-                                         hover:bg-gray-800 transition-colors duration-150
-                                         shadow-sm hover:shadow-md
-                                         disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="block w-full max-w-xs mx-auto px-12 py-4 bg-gray-900
+                                         text-white text-base font-medium rounded-lg
+                                         hover:bg-gray-800 transition-all duration-200
+                                         shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-[0.99]
+                                         disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                             >
                                 Enter Lobby
                             </button>
