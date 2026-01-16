@@ -1,13 +1,13 @@
-import escrowABI from "../abi/WizardsCentralEscrow.json"
+import escrowABI from "../abi/MaxGasDojoEscrow.json"
 import mgdABI from "../abi/MGD.json"
 
 export const contracts = {
     escrow: {
-        address: "0x186C96B9c362DBBf4D33C6dAd04127F0238F5499",
+        address: "0xC786901b38d0148C791dc7e4e50AEF462Ce2d042",
         abi: escrowABI.abi
     },
     mgd: {
-        address: "0x1FD5270705F2F6b69a57b1eb72901031b1c46752",
+        address: "0x35E4FA6F650613d8f692C0ab4f12eb09AD26208c",
         abi: mgdABI.abi
     }
 }
