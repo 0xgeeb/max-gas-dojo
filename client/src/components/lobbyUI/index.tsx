@@ -86,6 +86,14 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
             if (originalChallengeCancelled) originalChallengeCancelled(data);
         };
 
+        const originalFightStarting = gameEngine.onFightStarting;
+        gameEngine.onFightStarting = (data) => {
+            // Clear all pending challenges when entering a fight
+            setPendingChallenges([]);
+            setIncomingChallenges([]);
+            if (originalFightStarting) originalFightStarting(data);
+        };
+
         setPlayerId(gameEngine.getPlayerId())
 
         return () => {
@@ -94,6 +102,7 @@ export const LobbyUI = ({ gameEngine, lobbyState }) => {
             gameEngine.onChallengeResponse = originalChallengeResponse;
             gameEngine.onChallengeExpired = originalChallengeExpired;
             gameEngine.onChallengeCancelled = originalChallengeCancelled;
+            gameEngine.onFightStarting = originalFightStarting;
         };
     }, [gameEngine, pendingChallengeData]);
 

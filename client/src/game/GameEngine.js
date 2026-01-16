@@ -56,6 +56,7 @@ export class GameEngine {
         this.onToastMessage = null;
         this.onLobbyFull = null;
         this.onGameOver = null;
+        this.onFightStarting = null;
         this.gameOverFired = false;
 
         this.isRunning = false;
@@ -176,6 +177,11 @@ export class GameEngine {
             this.gameState = data.gameState;
             this.gameId = data.fightId;
             this.gameOverFired = false;
+
+            // Notify that fight is starting (clears pending challenges)
+            if (this.onFightStarting) {
+                this.onFightStarting(data);
+            }
 
             if (this.onToastMessage) {
                 this.onToastMessage('Fight starting in 3 seconds!');
