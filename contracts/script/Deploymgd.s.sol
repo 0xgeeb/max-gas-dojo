@@ -13,6 +13,7 @@ contract DeployScript is Script {
     address server = 0x895614c89beC7D11454312f740854d08CbF57A78;
     address dev = 0x05067835561cDaea1578Fe77dAA20d2890505534;
     address ape = 0x682F8b083762F9Ac760D9717aEc6321d1F4a585d;
+    address oldgeeb = 0x7A1aCe83A33D111c373871D5964857875aB39Add;
 
     address oldoldmgdaddy = 0x8016269e0c30d897f495470aC464c283bf51A77b;
     address oldoldescrowaddy = 0xc6f4D3Ae8443f091A9c5015041093F3c0a41956f;
@@ -29,7 +30,7 @@ contract DeployScript is Script {
         // _deployMGD();
         // _cancel();
         // _accept();
-        // _mint();
+        _mint();
 
         vm.stopBroadcast();
     }
@@ -49,7 +50,7 @@ contract DeployScript is Script {
     }
 
     function _mint() internal {
-        MGD(mgdaddy).mint(dev, 1_000_000e18);
+        MGD(mgdaddy).mint(oldgeeb, 69_000_000e18);
     }
 
 }

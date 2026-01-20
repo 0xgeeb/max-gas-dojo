@@ -22,7 +22,8 @@ const INITIAL_STATE = {
     sendWcApproveTx: async (_wager: number) => undefined as string | undefined,
     sendCreateMatchTx: async (_opponent: string, _wager: number) => undefined as { txHash: string, matchId: number } | undefined,
     sendAcceptMatchTx: async (_id: number) => undefined as string | undefined,
-    sendCancelMatchTx: async (_id: number) => undefined as string | undefined
+    sendCancelMatchTx: async (_id: number) => undefined as string | undefined,
+    sendMintTx: async () => undefined as string | undefined
 }
 
 const WalletContext = createContext(INITIAL_STATE)
@@ -169,6 +170,27 @@ export const WalletProvider = (props: PropsWithChildren<{}>) => {
         }
     }
 
+    const sendMintTx = async (): Promise<string> => {
+        try {
+            const hash = await writeContract(config, {
+                address: contracts.mgd.address as `0x${string}`,
+                abi: contracts.mgd.abi,
+                functionName: 'mint',
+                args: [address, parseEther('1000000')],
+                chain: base,
+                account: address
+            })
+            const data = await waitForTransactionReceipt(config, { hash })
+            await refreshWc()
+            return data.transactionHash
+        }
+        catch (e) {
+            console.log("user denied tx");
+            console.log("or: ", e);
+            throw e;
+        }
+    }
+
     return (
         <WalletContext.Provider value={{
             wcBalance: wcBalanceState,
@@ -178,7 +200,8 @@ export const WalletProvider = (props: PropsWithChildren<{}>) => {
             sendWcApproveTx,
             sendCreateMatchTx,
             sendAcceptMatchTx,
-            sendCancelMatchTx
+            sendCancelMatchTx,
+            sendMintTx
         }}>
             {children}
         </WalletContext.Provider>
